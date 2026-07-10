@@ -1,0 +1,9 @@
+{
+    "recent_avg_discharge_delay_hours": 0.0,
+    "recent_readmission_risk_trend": "stable",
+    "most_common_bottleneck": "None",
+    "recent_bed_recovery_count": 0,
+    "last_recommendation": "None",
+    "last_updated": "2026-06-28 10:55:00.850679",
+    "memory_reasoning": "Initial state"
+}

@@ -1,0 +1,23 @@
+[
+    {
+        "test": "event",
+        "scenario_signature": {
+            "primary_bottleneck": "Pharmacy"
+        },
+        "timestamp": "2026-06-28 10:55:00.853187"
+    },
+    {
+        "test": "event",
+        "scenario_signature": {
+            "primary_bottleneck": "Pharmacy"
+        },
+        "timestamp": "2026-06-28 12:02:20.033359"
+    },
+    {
+        "test": "event",
+        "scenario_signature": {
+            "primary_bottleneck": "Pharmacy"
+        },
+        "timestamp": "2026-06-28 12:04:45.454813"
+    }
+]
