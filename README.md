@@ -51,14 +51,14 @@ flowchart TB
     end
 
     subgraph API["Flask API"]
-        B1[/api/demo_patients]
-        B2[/api/train_models]
-        B3[/api/predict_patient]
-        B4[/api/run_committee]
-        B5[/api/save_human_decision]
-        B6[/api/memory_state]
-        B7[/api/audit_log]
-        B8[/api/model_metrics]
+        B1["/api/demo_patients"]
+        B2["/api/train_models"]
+        B3["/api/predict_patient"]
+        B4["/api/run_committee"]
+        B5["/api/save_human_decision"]
+        B6["/api/memory_state"]
+        B7["/api/audit_log"]
+        B8["/api/model_metrics"]
     end
 
     subgraph ML["Predictive ML Layer"]
