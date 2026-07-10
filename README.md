@@ -42,61 +42,40 @@ BedFlow AI provides:
 ## High-Level Architecture
 
 ```mermaid
-flowchart TB
-    subgraph UI["Streamlit Dashboard"]
-        A1[Control Tower]
-        A2[Model Performance]
-        A3[Memory & Audit Log]
-        A4[Data & Limitations]
+flowchart LR
+    classDef ui fill:#0984e3,stroke:#fff,color:#fff,stroke-width:2px,rx:5px,ry:5px
+    classDef api fill:#00b894,stroke:#fff,color:#fff,stroke-width:2px,rx:5px,ry:5px
+    classDef engine fill:#6c5ce7,stroke:#fff,color:#fff,stroke-width:2px,rx:5px,ry:5px
+    classDef store fill:#d63031,stroke:#fff,color:#fff,stroke-width:2px,rx:5px,ry:5px
+
+    subgraph Presentation ["🖥️ Frontend"]
+        UI[Streamlit Dashboard]:::ui
     end
 
-    subgraph API["Flask API"]
-        B1["/api/demo_patients"]
-        B2["/api/train_models"]
-        B3["/api/predict_patient"]
-        B4["/api/run_committee"]
-        B5["/api/save_human_decision"]
-        B6["/api/memory_state"]
-        B7["/api/audit_log"]
-        B8["/api/model_metrics"]
+    subgraph Gateway ["⚙️ Backend API"]
+        API[Flask Server]:::api
     end
 
-    subgraph ML["Predictive ML Layer"]
-        C1[Discharge Delay Classifier]
-        C2[Readmission Risk Classifier]
-        C3[Delay-Hours Regressor]
+    subgraph Intelligence ["🧠 Intelligence Layer"]
+        direction TB
+        ML[Predictive Models\nDelay / Readmission]:::engine
+        Rules[Operational Modules\nSafety / Pharmacy / Bed]:::engine
+        Arb[AI Committee\nArbitration Logic]:::engine
+        
+        ML --> Arb
+        Rules --> Arb
     end
 
-    subgraph OPS["Operational Decision Layer"]
-        D1[Patient Safety Module]
-        D2[Pharmacy Module]
-        D3[Transport Module]
-        D4[Rehab / SNF Module]
-        D5[Insurance Module]
-        D6[Home-Care Module]
-        D7[Bed-Capacity Module]
-        D8[AI Committee Arbitration]
+    subgraph Persistence ["💾 Local Storage"]
+        direction TB
+        DB1[(Patient Data CSV)]:::store
+        DB2[(Memory & Audit JSON)]:::store
     end
 
-    subgraph DATA["Local Persistence"]
-        E1[(bedflow_patient_data.csv)]
-        E2[(model_metrics.json)]
-        E3[(bedflow_memory_state.json)]
-        E4[(bedflow_memory_history.json)]
-        E5[(audit_log.json)]
-    end
-
-    UI --> API
-    B1 --> E1
-    B2 --> ML
-    B3 --> ML
-    ML --> B4
-    B4 --> OPS
-    OPS --> UI
-    E4 --> D8
-    B5 --> E5
-    B5 --> E4
-    B8 --> E2
+    UI <-->|REST / JSON| API
+    API --> Intelligence
+    Intelligence --> API
+    API <--> Persistence
 ```
 
 ---
