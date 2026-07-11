@@ -33,7 +33,7 @@ The application helps an authorized hospital team answer three practical questio
 
 - [Product overview](#product-overview)
 - [Core capabilities](#core-capabilities)
-- [Application screenshots](#application-screenshots)
+- [Visual tour](#visual-tour)
 - [System architecture](#system-architecture)
 - [End-to-end workflow](#end-to-end-workflow)
 - [Predictive analytics](#predictive-analytics)
@@ -99,21 +99,19 @@ BedFlow AI brings those signals into one operational workflow:
 
 ---
 
-## Application screenshots
-
-*(Add your screenshots to the `docs/images/` directory. Once they are there, they will automatically appear below!)*
+## Visual Tour
 
 | Hospital Command Center | Patient Case Review |
 |:---:|:---:|
-| ![Command Center](docs/images/control_tower_dashboard.png) | ![Patient Review](docs/images/patient_case_review.png) |
+| ![Command Center](docs/images/control_tower_dashboard.png)<br><sub>*The live operational bed board showing unit capacity alongside the ML-scored discharge queue.*</sub> | ![Patient Review](docs/images/patient_case_review.png)<br><sub>*Deep dive into a specific patient's operational bottlenecks and auto-generated readiness checklist.*</sub> |
 
 | Multi-Agent Committee Debate | Task & Escalation Workflow |
 |:---:|:---:|
-| ![Agent Debate](docs/images/ai_committee_debate.png) | ![Tasks](docs/images/task_escalation_workflow.png) |
+| ![Agent Debate](docs/images/ai_committee_debate.png)<br><sub>*The AI Committee (Safety, Operations, Director) actively debating the discharge plan using retrieved hospital policies.*</sub> | ![Tasks](docs/images/task_escalation_workflow.png)<br><sub>*Role-assigned tasks complete with SLAs, escalation timers, and an immutable audit log of ownership.*</sub> |
 
 | Capacity Simulator | FHIR Interoperability |
 |:---:|:---:|
-| ![Simulator](docs/images/capacity_simulator.png) | ![FHIR](docs/images/fhir_interoperability.png) |
+| ![Simulator](docs/images/capacity_simulator.png)<br><sub>*Counterfactual "What-If" planning to predict the bed-recovery impact of resolving specific hospital blockers.*</sub> | ![FHIR](docs/images/fhir_interoperability.png)<br><sub>*Generating a compliant FHIR R4 JSON bundle of the patient's case for seamless EHR integration.*</sub> |
 
 ---
 
