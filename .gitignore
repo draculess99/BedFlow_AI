@@ -49,3 +49,9 @@ database/bedflow_memory_state.json
 # Optional mounted/local runtime directory
 /data/
 *.json.tmp
+
+# Internal development and stage documentation
+docs/STAGE_*.md
+docs/MODERNIZATION_*.md
+docs/PERSISTENT_*.md
+docs/BEDFLOW_*.md
