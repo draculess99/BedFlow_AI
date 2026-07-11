@@ -32,10 +32,91 @@ BedFlow AI provides:
 - **30-day readmission risk prediction** using XGBoost classification.
 - **Expected discharge delay-hours prediction** using XGBoost regression.
 - **Operational bottleneck analysis** across pharmacy, transport, rehab/SNF, insurance, home care, patient safety, and bed-capacity pressure.
-- **AI committee recommendation** that converts model outputs and operational signals into an action plan.
+- **Discharge readiness checklist** that converts raw blocker flags into owned checklist items, severity, completion percentage, and recommended actions.
+- **Task ownership and escalation workflow** that turns active blockers into role-owned tasks with statuses, SLA timers, overdue flags, and escalation levels.
+- **Model explainability and risk reasons** that show top patient-specific drivers for discharge delay, readmission risk, and expected delay hours.
+- **AI committee recommendation** that converts model outputs, checklist status, and operational signals into an action plan.
 - **Persistent memory lookup** that compares the current case with prior reviewed cases.
 - **Human-in-the-loop approval** before any recommendation is logged.
 - **Audit trail** for reviewed cases and supervisor decisions.
+- **FHIR-style interoperability export** that maps a de-identified case into Patient, Encounter, Observation, Task, CarePlan, Location, and Bundle resources.
+
+### Stage 1 Command Center Upgrade
+
+This version adds the first professionalization stage: a hospital command-center view before the single-patient review workflow.
+
+New Stage 1 features include:
+
+- Hospital-wide capacity KPI cards.
+- Unit-level bed board with pressure level, occupied beds, open beds, pending discharges, delayed discharges, and ED boarders.
+- Prioritized multi-patient discharge queue.
+- Operational priority score for bed recovery.
+- Owner role and next-action columns for each patient blocker.
+- Patient selection directly from the command-center queue.
+
+The command-center queue is intentionally fast. It uses existing operational proxy fields and does **not** retrain or run the XGBoost models for every patient in the queue. Full ML inference still happens when the user clicks **Evaluate Patient Case** for a selected patient.
+
+### Stage 2 Discharge Readiness Checklist Upgrade
+
+This version also adds the second professionalization stage: a hospital-style discharge readiness checklist.
+
+New Stage 2 features include:
+
+- Structured discharge readiness checklist for each selected patient.
+- Completion percentage, readiness status, and active blocker count.
+- Severity levels for blockers: Critical, High, Medium, Low.
+- Owner roles for each blocker: Physician, Pharmacy, Case Manager, Utilization Management, Transport, Social Worker, and Family / Case Manager.
+- Active blocker table with recommended next action.
+- Full checklist expander in the UI.
+- Committee logic that uses checklist blockers before recommending discharge actions.
+- Audit log support for saving the checklist used during human review.
+
+The checklist does not train another model. It turns existing operational fields into a more realistic hospital workflow.
+
+### Stage 3 Task Ownership and Escalation Workflow Upgrade
+
+This version adds the third professionalization stage: discharge blockers now become operational work items.
+
+New Stage 3 features include:
+
+- Local task workflow store in `database/tasks.json`.
+- Task generation from active discharge checklist blockers.
+- Owner role per task: Physician, Pharmacy, Transport, Case Manager, Utilization Management, Social Worker, or Bed Manager.
+- Task status tracking: Pending, In Progress, Blocked, Escalated, and Completed.
+- SLA timers and overdue detection.
+- Escalation level calculation based on severity and overdue status.
+- Patient-level task panel in the Control Tower.
+- Hospital-wide **Tasks & Escalations** tab.
+- Task snapshot included in the human-review audit payload.
+
+This stage makes BedFlow feel more like a real hospital workflow product because it does not only identify a blocker; it assigns the work, tracks its status, and flags overdue items.
+
+### Stage 4 Explainability and Risk Reasons Upgrade
+
+This version adds the fourth professionalization stage: model outputs now include plain-English risk reasons and feature-driver tables.
+
+New Stage 4 features include:
+
+- Patient-level model explanation panel in the Control Tower.
+- Top drivers for discharge delay risk.
+- Top drivers for 30-day readmission risk.
+- Top drivers for expected discharge delay hours.
+- Plain-English explanation summary for the selected patient.
+- Global feature-importance tables in the Model Performance tab.
+- Audit log support for saving the explanation payload used during human review.
+
+The current explanation method uses native XGBoost feature importance combined with the selected patient's active feature values. It is intentionally lightweight and does not require SHAP. A production system could add formal SHAP explanations, calibration, fairness checks, versioned model cards, and clinical governance review.
+
+
+### Stage 7 FHIR-Style Interoperability Upgrade
+
+This version adds an export-only interoperability layer for portfolio and integration demonstrations.
+
+- Generates de-identified FHIR R4-shaped JSON.
+- Maps BedFlow patient-flow data to Patient, Encounter, Observation, Task, CarePlan, Location, and Bundle resources.
+- Adds `GET /api/fhir/capability` and `POST /api/fhir/bundle`.
+- Adds a dashboard tab to preview and download the bundle.
+- Does not claim certified FHIR conformance, SMART on FHIR authorization, EHR persistence, or clinical validation.
 
 ---
 
@@ -70,6 +151,7 @@ flowchart LR
         direction TB
         DB1[(Patient Data CSV)]:::store
         DB2[(Memory & Audit JSON)]:::store
+        DB3[(Task Queue JSON)]:::store
     end
 
     UI <-->|REST / JSON| API
@@ -93,8 +175,10 @@ flowchart TD
     D --> E[Start Flask backend on port 5005]
     E --> F[Start Streamlit dashboard on port 8501]
 
-    F --> G[User selects a patient]
-    G --> H[User clicks Evaluate Patient Case]
+    F --> G[User selects a patient from command-center queue]
+    G --> G1[Build discharge readiness checklist]
+    G1 --> G2[Create or refresh owned tasks]
+    G2 --> H[User clicks Evaluate Patient Case]
 
     H --> I{Models trained in current backend process?}
     I -- No --> J[Train XGBoost models on demand]
@@ -111,6 +195,7 @@ flowchart TD
 
     M --> N[Run operational modules]
     N --> O[AI committee recommendation]
+    G2 --> O
     P[Prior reviewed cases memory] --> O
 
     O --> Q[Final recommendation + action plan]
@@ -123,6 +208,7 @@ flowchart TD
     S -->|Hold| T
 
     T --> U[Update memory history]
+    T --> V[Save checklist and task snapshot]
     U --> P
 ```
 
@@ -142,9 +228,23 @@ The main training method is:
 BedFlowModels.train_models()
 ```
 
-There are two ways training happens.
+There are now three ways model lifecycle behavior happens.
 
-### 1. On-Demand Training During First Prediction
+### 1. Saved Artifact Loading at Backend Startup
+
+When the Flask backend starts, `BedFlowModels.__init__()` attempts to load the latest saved artifacts from:
+
+```text
+models/discharge_delay_xgb.joblib
+models/readmission_xgb.joblib
+models/delay_hours_xgb.joblib
+models/feature_columns.json
+models/model_registry.json
+```
+
+If those files exist, predictions run immediately using the saved model version.
+
+### 2. On-Demand Fallback Training
 
 When the user clicks **Evaluate Patient Case**, the dashboard calls:
 
@@ -152,23 +252,14 @@ When the user clicks **Evaluate Patient Case**, the dashboard calls:
 POST /api/predict_patient
 ```
 
-Inside the model layer, the app checks whether models have already been trained in the current backend process:
+If no model is loaded in memory and no saved artifacts exist, the backend trains the models and publishes artifacts automatically. This keeps the demo easy to run even after a clean unzip.
 
-```python
-if not self.is_trained:
-    self.train_models()
-```
+### 3. Manual Training and Publishing
 
-That means the **first patient evaluation after a backend restart triggers training automatically**.
-
-After training finishes, the models stay in memory and are reused for later patient evaluations.
-
-### 2. Manual Training from the Dashboard
-
-The **Model Performance** tab includes a button:
+The **Model Performance & Governance** tab includes:
 
 ```text
-Refresh / Train Models
+Train & Publish Versioned Models
 ```
 
 That calls:
@@ -177,23 +268,29 @@ That calls:
 POST /api/train_models
 ```
 
-This retrains all three models and refreshes model metrics.
+You can also train from the command line:
+
+```bash
+python training/train_models.py
+```
 
 ### Important Training Behavior
 
-The current application does **not** save trained model artifacts to disk. It saves only metrics.
-
 | Item | Saved? | Location |
 |---|---:|---|
-| Trained XGBoost model objects | No | In memory only |
-| Model metrics | Yes | `database/model_metrics.json` |
+| Trained XGBoost model objects | Yes | `models/*.joblib` |
+| Feature-column order | Yes | `models/feature_columns.json` |
+| Model registry/version | Yes | `models/model_registry.json` |
+| Generated model card | Yes | `models/model_card.md` |
+| Latest model metrics | Yes | `database/model_metrics.json` |
+| Metrics history | Yes | `database/model_metrics_history.json` |
 | Synthetic patient dataset | Yes | `database/bedflow_patient_data.csv` |
 | Human decisions | Yes | `database/audit_log.json` |
 | Prior-case memory history | Yes | `database/bedflow_memory_history.json` |
 
-So the current design is:
+So the current Stage 5 design is:
 
-> Train lazily on first prediction, keep models in memory, and retrain manually or after a backend restart.
+> Load saved model artifacts when available; otherwise train and publish artifacts on demand for the demo.
 
 ---
 
@@ -270,6 +367,102 @@ These modules are currently deterministic rule-based evaluators. They are not se
 | Insurance | Authorization pending, especially for facility discharge | Urgent utilization-management review |
 | Home Care | Home-care setup, home support, living alone | Expedite home-health agency intake |
 | Bed Capacity | Bed occupancy, ED boarding count, predicted delay hours | Prioritize discharge to relieve boarding |
+
+---
+
+## Discharge Readiness Checklist
+
+The Stage 2 checklist is located in:
+
+```text
+backend/discharge_checklist.py
+```
+
+The Stage 3 task workflow is located in:
+
+```text
+backend/tasks.py
+database/tasks.json
+```
+
+It converts existing patient fields into a structured hospital workflow.
+
+| Checklist Area | Owner | Why It Matters |
+|---|---|---|
+| Lab stability | Physician | Prevents unsafe discharge when clinical status is unstable |
+| Vital signs | Physician | Ensures the patient is clinically ready |
+| Doctor signoff | Physician | Confirms discharge order/readiness |
+| Medication reconciliation | Pharmacy | Reduces medication-related discharge delays and readmission risk |
+| Discharge prescriptions | Pharmacy | Ensures prescriptions are ready before release |
+| Transport | Transport | Confirms patient can physically leave the hospital |
+| Insurance authorization | Utilization Management | Required for many facility-based discharges |
+| Rehab/SNF placement | Case Manager | Confirms receiving facility placement |
+| Home care setup | Case Manager | Confirms safe support after discharge |
+| Social work review | Social Worker | Handles social barriers to discharge |
+| Family/caregiver support | Family / Case Manager | Confirms pickup and support plan |
+| Case manager availability | Case Manager | Ensures operational owner coverage |
+
+### Readiness Status Rules
+
+| Status | Meaning |
+|---|---|
+| Ready for Discharge | All required items are complete or not required |
+| Almost Ready | Only medium-priority blockers remain |
+| Blocked | One or more high or critical operational blockers remain |
+| Escalate Now | Critical blocker exists while bed pressure is high |
+| Not Clinically Ready | Lab or vital-sign stability is incomplete |
+
+The checklist appears before the user clicks **Evaluate Patient Case**, so the user can understand the operational barriers immediately. When AI evaluation is run, the committee uses the checklist as part of its recommendation logic.
+
+---
+
+## Explainability and Risk Reasons
+
+Stage 4 explainability is implemented primarily in:
+
+```text
+backend/models.py
+frontend/dashboard.py
+```
+
+New endpoints:
+
+```text
+POST /api/explain_patient
+GET  /api/model_feature_importance?top_n=12
+```
+
+After the user clicks **Evaluate Patient Case**, the app shows a risk-reason panel with:
+
+- Plain-English explanation summary.
+- Discharge-delay risk drivers.
+- Readmission-risk drivers.
+- Expected delay-hours drivers.
+- Patient value for each driver.
+- Model importance score.
+- Why the driver matters.
+
+The explanation method is:
+
+```text
+XGBoost feature_importances_ + selected-patient active feature values
+```
+
+This is not formal SHAP. It is a lightweight, dependency-free explanation layer designed for portfolio demonstration and audit transparency.
+
+For example, a high-risk patient may show drivers such as:
+
+```text
+Insurance authorization pending
+Rehab/SNF placement pending
+High medication count
+Prior readmissions
+High bed occupancy
+ED boarding count
+Limited home support
+```
+
+The Model Performance tab also shows global feature-importance tables for all three trained models.
 
 ---
 
@@ -364,6 +557,12 @@ This is not vector RAG yet. It is currently case-based memory matching.
 
 ---
 
+### Stage 5 Model Lifecycle and Governance Upgrade
+
+Stage 5 adds saved model artifacts, a model registry, feature-column artifact, metrics history, generated model card, offline training script, and a dashboard governance panel. This makes the ML side look more professional because every prediction can now be tied back to a visible model version, dataset hash, and training timestamp.
+
+---
+
 ## API Endpoints
 
 The Flask backend runs on:
@@ -376,7 +575,21 @@ http://127.0.0.1:5005
 |---|---|---|
 | `/api/health` | GET | Backend health check |
 | `/api/demo_patients` | GET | Returns available patient records |
-| `/api/train_models` | POST | Trains/retrains all ML models |
+| `/api/hospital_capacity` | GET | Returns hospital-wide and unit-level command-center capacity metrics |
+| `/api/discharge_queue` | GET | Returns prioritized multi-patient discharge queue |
+| `/api/discharge_checklist` | POST | Returns readiness checklist, active blockers, owner roles, and actions for one patient |
+| `/api/tasks` | GET | Returns task workflow records, optionally filtered by patient, owner, or status |
+| `/api/tasks/summary` | GET | Returns task workload counts and owner summary |
+| `/api/tasks/overdue` | GET | Returns active tasks past their SLA timer |
+| `/api/tasks/<patient_id>` | GET | Returns all tasks for one patient |
+| `/api/tasks/sync` | POST | Creates or refreshes patient tasks from checklist blockers |
+| `/api/tasks/sync_all` | POST | Creates or refreshes tasks from demo patients |
+| `/api/tasks/update_status` | POST | Updates one task status and optional note |
+| `/api/train_models` | POST | Trains/retrains all ML models and publishes versioned artifacts |
+| `/api/model_governance` | GET | Returns model registry, artifact status, dataset hash, feature count, and metrics-history summary |
+| `/api/load_latest_model` | POST | Loads latest saved model artifacts into the running backend |
+| `/api/model_card` | GET | Returns generated model card markdown |
+| `/api/model_metrics_history` | GET | Returns historical training metrics entries |
 | `/api/model_metrics` | GET | Returns saved model metrics |
 | `/api/predict_patient` | POST | Runs patient-level ML inference |
 | `/api/run_committee` | POST | Runs operational modules and committee logic |
@@ -398,6 +611,9 @@ bedflow_ai/
 │   ├── api.py
 │   ├── audit.py
 │   ├── committee.py
+│   ├── command_center.py
+│   ├── discharge_checklist.py
+│   ├── tasks.py
 │   ├── memory.py
 │   ├── models.py
 │   ├── research_modules.py
@@ -409,12 +625,25 @@ bedflow_ai/
 ├── scripts/
 │   └── generate_bedflow_dataset.py
 │
+├── training/
+│   └── train_models.py
+│
+├── models/
+│   ├── model_registry.json
+│   ├── feature_columns.json
+│   ├── model_card.md
+│   ├── discharge_delay_xgb.joblib
+│   ├── readmission_xgb.joblib
+│   └── delay_hours_xgb.joblib
+│
 ├── database/
 │   ├── bedflow_patient_data.csv
 │   ├── model_metrics.json
+│   ├── model_metrics_history.json
 │   ├── bedflow_memory_state.json
 │   ├── bedflow_memory_history.json
-│   └── audit_log.json
+│   ├── audit_log.json
+│   └── tasks.json
 │
 ├── dataset_diabetes/
 │   ├── diabetic_data.csv
@@ -425,6 +654,31 @@ bedflow_ai/
 ```
 
 > Note: The `dataset_diabetes/` files are included in the project package, but the current active model pipeline trains on `database/bedflow_patient_data.csv`.
+
+---
+
+## Stage 5 Training and Model Artifact Workflow
+
+To train models outside the UI and publish versioned artifacts, run:
+
+```bash
+python training/train_models.py
+```
+
+This creates or updates:
+
+```text
+models/discharge_delay_xgb.joblib
+models/readmission_xgb.joblib
+models/delay_hours_xgb.joblib
+models/feature_columns.json
+models/model_registry.json
+models/model_card.md
+database/model_metrics.json
+database/model_metrics_history.json
+```
+
+When the Flask backend starts, it tries to load saved artifacts first. If artifacts are missing, the first prediction can still train and publish models on demand.
 
 ---
 
@@ -521,37 +775,45 @@ The smoke test checks:
 
 ## Example Current Model Metrics
 
-The current generated dataset produced the following sample metrics.
+The current Stage 6 model artifacts were trained with a hybrid data strategy:
+
+```text
+Discharge delay classifier      → synthetic/proxy BedFlow operations data
+Readmission risk classifier     → public diabetes hospital readmission data transformed into BedFlow schema
+Expected delay-hours regressor  → synthetic/proxy BedFlow operations data
+```
 
 ### Discharge Delay Classifier
 
 | Metric | XGBoost | Baseline |
 |---|---:|---:|
-| Accuracy | 0.90 | 0.63 |
-| Precision | 0.91 | 0.63 |
-| Recall | 0.94 | 1.00 |
-| F1 | 0.92 | 0.77 |
-| ROC-AUC | 0.97 | N/A |
+| Accuracy | 0.95 | 0.60 |
+| Precision | 0.94 | 0.60 |
+| Recall | 0.98 | 1.00 |
+| F1 | 0.96 | 0.75 |
+| ROC-AUC | 0.99 | N/A |
 
 ### Readmission Risk Classifier
 
 | Metric | XGBoost | Baseline |
 |---|---:|---:|
-| Accuracy | 0.94 | 0.82 |
-| Precision | 0.93 | 0.82 |
-| Recall | 1.00 | 1.00 |
-| F1 | 0.96 | 0.90 |
-| ROC-AUC | 0.98 | N/A |
+| Accuracy | 0.73 | 0.89 |
+| Precision | 0.20 | 0.00 |
+| Recall | 0.46 | 0.00 |
+| F1 | 0.28 | 0.00 |
+| ROC-AUC | 0.66 | N/A |
+
+The readmission model is trained against the public `<30 days` readmission label. Because that label is imbalanced, the metrics snapshot uses class weighting and a 0.55 decision threshold for evaluation. The app still exposes the raw probability and risk band for human review.
 
 ### Expected Delay-Hours Regressor
 
 | Metric | XGBoost | Baseline |
 |---|---:|---:|
-| MAE | 2.18 | 5.81 |
-| RMSE | 2.90 | 7.12 |
-| R² | 0.83 | -0.04 |
+| MAE | 1.89 | 5.81 |
+| RMSE | 2.51 | 7.12 |
+| R² | 0.87 | -0.04 |
 
-These metrics are based on synthetic data and should be treated as demonstration results only.
+These metrics are demonstration results only. They are not hospital-validated clinical performance claims.
 
 ---
 
@@ -559,11 +821,29 @@ These metrics are based on synthetic data and should be treated as demonstration
 
 ### Control Tower
 
-Main workflow for selecting a patient, running model predictions, running committee analysis, reviewing bottlenecks, and saving the human decision.
+Main workflow for selecting a patient, running model predictions, reviewing risk reasons, running committee analysis, reviewing bottlenecks, and saving the human decision.
 
-### Model Performance
+### Tasks & Escalations
 
-Shows model metrics and allows the user to manually retrain models.
+Shows the hospital-wide task queue, active workload by owner, overdue tasks, and generated discharge-blocker tasks. Users can generate or refresh workflow tasks from demo patients.
+
+### Model Performance & Governance
+
+Shows model metrics, global feature importance, versioned artifact status, dataset hash, metrics history, generated model card, and controls for training/publishing or loading saved artifacts.
+
+Stage 6 also adds a **Data Sources** panel showing the hybrid training strategy:
+
+```text
+Discharge delay risk      → synthetic/proxy BedFlow operational dataset
+Expected delay hours      → synthetic/proxy BedFlow operational dataset
+30-day readmission risk   → public diabetes hospital readmission dataset transformed into BedFlow schema
+```
+
+The dashboard includes a **Prepare Public Readmission Data** button that creates:
+
+```text
+database/readmission_training_data.csv
+```
 
 ### Memory & Audit Log
 
@@ -572,6 +852,46 @@ Displays persistent memory state and prior human-reviewed audit records.
 ### Data & Limitations
 
 Explains that the application uses synthetic/proxy data and requires human oversight.
+
+---
+
+## Stage 6 — Public / Realistic Readmission Data Upgrade
+
+Stage 6 improves the data story by moving the **30-day readmission-risk model** onto the included public diabetes hospital dataset, while keeping the discharge-delay and delay-hours models on synthetic/proxy BedFlow operational data.
+
+### Hybrid training strategy
+
+| Model | Training source |
+|---|---|
+| Discharge delay classifier | `database/bedflow_patient_data.csv` |
+| Expected delay-hours regressor | `database/bedflow_patient_data.csv` |
+| 30-day readmission classifier | `database/readmission_training_data.csv` generated from `dataset_diabetes/diabetic_data.csv` |
+
+### New data-preparation command
+
+```bash
+python scripts/prepare_diabetes_readmission_data.py
+```
+
+### New training command
+
+```bash
+python training/train_models.py
+```
+
+The training script now prepares the public readmission layer first, then trains and publishes the versioned XGBoost artifacts.
+
+### New API endpoints
+
+```text
+GET  /api/data_sources
+POST /api/prepare_readmission_data
+```
+
+### Governance note
+
+The public readmission dataset is transformed into the BedFlow feature schema. Race and gender are intentionally excluded from the transformed model features. Operational blockers such as pharmacy, transport, insurance authorization, SNF/Rehab placement, home-care setup, bed pressure, and ED boarding remain synthetic/proxy operational features.
+
 
 ---
 
@@ -597,31 +917,40 @@ This is a strong portfolio/capstone prototype, but it is not production hospital
 
 Current limitations:
 
-- Trained models are held in memory and are not serialized to disk.
-- Training happens inside the Flask web process.
+- Stage 5 now serializes demo model artifacts to disk, but this is still not a production model registry.
+- Explainability uses lightweight feature importance, not formal SHAP.
+- The UI can still trigger training for demonstration; production training should run in a controlled offline pipeline with approval gates.
 - Data is synthetic/proxy data, not hospital-validated clinical data.
 - Operational modules are deterministic rules, not independently validated clinical models.
 - Memory is simple case matching, not vector search or full RAG.
-- Audit and memory persistence use local JSON files rather than a production database.
+- Audit, memory, and task workflow persistence use local JSON files rather than a production database.
 - No authentication, role-based access control, or PHI-grade compliance layer is included.
-- The included diabetes dataset is not currently wired into the active BedFlow training pipeline.
+- Stage 6 wires the included diabetes hospital dataset into the readmission-risk training pipeline, but it remains a proxy public dataset and not hospital-validated local data.
 
 ---
 
-## Future Work
+## Upgrade Status and Next Steps
+
+Implemented professionalization stages:
+
+1. Hospital command center
+2. Discharge readiness checklist
+3. Task ownership and escalation workflow
+4. Patient-level explainability and risk reasons
+5. Model lifecycle, saved artifacts, metrics history, and model card
+6. Public readmission-data training layer
+7. De-identified FHIR-style interoperability export
 
 Recommended next improvements:
 
-1. **Persist trained models** using `joblib`, `pickle`, or native XGBoost model serialization.
-2. **Add model versioning** so metrics, training data, and model artifacts are traceable.
-3. **Move training out of the web request path** into a scheduled or offline training job.
+1. **Stage 8 — Role-based workflow and stronger audit:** add authenticated roles, role-specific permissions, user attribution, audit filters, and mandatory override reasons.
+2. **Stage 9 — Capacity what-if simulator:** estimate beds recovered and delays reduced when pharmacy, transport, insurance, placement, or staffing constraints are changed.
+3. **Stage 10 — Portfolio and deployment polish:** add screenshots, demo video, GitHub Pages landing page, deployment notes, and API examples.
 4. **Replace local JSON storage** with SQLite, PostgreSQL, or another durable database.
-5. **Add authentication and user roles** for nurses, case managers, physicians, and administrators.
-6. **Add a real RAG layer** for discharge policies, payer rules, rehab placement criteria, and hospital SOPs.
-7. **Add explainability** with SHAP or feature contribution summaries.
-8. **Add drift monitoring** for model performance and operational patterns.
-9. **Add richer bed-flow simulation** to estimate downstream ED boarding relief.
-10. **Integrate real public healthcare datasets** where appropriate and clearly document data lineage.
+5. **Add model promotion and drift monitoring** before treating a newly trained model as active.
+6. **Upgrade explainability** from lightweight feature importance to formal SHAP, calibration, and subgroup evaluation.
+7. **Add SMART on FHIR / OAuth and real EHR connectivity** only for a production integration; the current Stage 7 feature is an export-only demonstration adapter.
+8. **Add CI tests** that load artifacts, run predictions, validate the FHIR bundle, and exercise critical API routes before deployment.
 
 ---
 
@@ -649,6 +978,10 @@ scikit-learn==1.3.2
 pandas==2.1.3
 numpy==1.26.2
 pytest==7.4.3
+joblib
+groq
+google-generativeai
+python-dotenv
 ```
 
 ---
@@ -667,4 +1000,3 @@ The system combines predictive modeling, operational rules, memory, and human-in
 
 This project is for educational, portfolio, and capstone demonstration purposes only. It is not a medical device, not a clinical decision system, and not intended for use with real patient care without proper validation, governance, privacy review, and regulatory assessment.
 
-"# BedFlow_AI" 

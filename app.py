@@ -21,6 +21,8 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent
 
 DATASET_PATH = ROOT_DIR / "database" / "bedflow_patient_data.csv"
+READMISSION_TRAINING_PATH = ROOT_DIR / "database" / "readmission_training_data.csv"
+READMISSION_GENERATOR = ROOT_DIR / "scripts" / "prepare_diabetes_readmission_data.py"
 DATA_GENERATOR = ROOT_DIR / "scripts" / "generate_bedflow_dataset.py"
 
 BACKEND_MODULE = "backend.api"
@@ -48,6 +50,29 @@ def generate_dataset_if_missing() -> None:
         raise RuntimeError("Dataset generation ran, but dataset file was not created.")
 
     print(f"✅ Dataset generated: {DATASET_PATH}")
+
+
+def generate_readmission_dataset_if_missing() -> None:
+    """Prepare the Stage 6 public readmission training layer if it is missing."""
+    if READMISSION_TRAINING_PATH.exists():
+        print(f"✅ Public readmission training dataset found: {READMISSION_TRAINING_PATH}")
+        return
+
+    if not READMISSION_GENERATOR.exists():
+        print("⚠️ Stage 6 readmission generator not found; readmission model can fall back to synthetic data.")
+        return
+
+    print("⚠️ Public readmission training dataset not found. Preparing Stage 6 data layer...")
+    subprocess.run(
+        [sys.executable, str(READMISSION_GENERATOR)],
+        cwd=str(ROOT_DIR),
+        check=True,
+    )
+
+    if READMISSION_TRAINING_PATH.exists():
+        print(f"✅ Public readmission training dataset prepared: {READMISSION_TRAINING_PATH}")
+    else:
+        print("⚠️ Public readmission dataset was not created; app can still run in synthetic-only fallback mode.")
 
 
 def start_backend() -> subprocess.Popen:
@@ -107,6 +132,7 @@ def main() -> None:
 
     try:
         generate_dataset_if_missing()
+        generate_readmission_dataset_if_missing()
 
         backend_process = start_backend()
 

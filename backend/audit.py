@@ -10,7 +10,18 @@ def init_audit_log():
         with open(AUDIT_LOG_PATH, "w") as f:
             json.dump([], f, indent=4)
 
-def log_human_decision(patient_id, model_outputs, research_outputs, committee_rec, human_decision, human_note, memory_insight):
+def log_human_decision(
+    patient_id,
+    model_outputs,
+    research_outputs,
+    committee_rec,
+    human_decision,
+    human_note,
+    memory_insight,
+    discharge_checklist=None,
+    task_snapshot=None,
+    model_explanations=None,
+):
     init_audit_log()
     record = {
         "timestamp": str(datetime.datetime.now()),
@@ -22,7 +33,10 @@ def log_human_decision(patient_id, model_outputs, research_outputs, committee_re
         "human_note": human_note,
         "risk_level": model_outputs.get("delay_risk_level", "Unknown"),
         "bed_capacity_impact": research_outputs.get("bed_capacity", {}).get("bed_pressure_level", "Unknown"),
-        "memory_insight": memory_insight
+        "memory_insight": memory_insight,
+        "discharge_checklist": discharge_checklist,
+        "task_snapshot": task_snapshot,
+        "model_explanations": model_explanations
     }
     
     with open(AUDIT_LOG_PATH, "r") as f:
