@@ -2700,5 +2700,473 @@
       },
       "status": "success"
     }
+  },
+  {
+    "audit_id": "AUD-E8B7D072BBCF4F48",
+    "timestamp_utc": "2026-07-11T09:47:12+00:00",
+    "timestamp": "2026-07-11T09:47:12+00:00",
+    "patient_id": "PT0072",
+    "reviewer_name": "Jordan Lee",
+    "reviewer_role": "Bed Manager",
+    "reviewer_user_id": "USR-62E6DA2EE9AF",
+    "authentication_source": "local-demo-rbac",
+    "model_version": "bedflow-xgb-20260711T055014Z",
+    "model_outputs": {
+      "delay_risk_level": "Critical",
+      "discharge_delay_risk_probability": 0.9887912273406982,
+      "model_version": "bedflow-xgb-20260711T055014Z",
+      "predicted_delay_hours": 19.8,
+      "prediction_source": "saved XGBoost artifacts",
+      "prediction_timestamp_utc": "2026-07-11T09:46:53+00:00",
+      "readmission_risk_level": "High",
+      "readmission_risk_probability": 0.745212733745575
+    },
+    "research_outputs": {
+      "bed_capacity": {
+        "bed_pressure_level": "Critical",
+        "ed_boarding_relief_level": "Critical",
+        "estimated_bed_recovery_value": "High (Boarding Relief)",
+        "recommended_action": "Prioritize this discharge to open bed for ED boarder"
+      },
+      "home_care": {
+        "home_care_delay_reason": "Cleared",
+        "home_care_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "insurance": {
+        "insurance_delay_reason": "Standard auth pending",
+        "insurance_pressure_level": "Medium",
+        "recommended_action": "Check payer portal"
+      },
+      "pharmacy": {
+        "pharmacy_delay_reason": "Cleared",
+        "pharmacy_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "rehab": {
+        "placement_delay_reason": "N/A",
+        "placement_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "safety": {
+        "patient_safety_level": "Critical",
+        "recommended_action": "Hold discharge for safety. MD review required.",
+        "safety_reason": "Clinical instability"
+      },
+      "transport": {
+        "recommended_action": "Contact family for ETA or reassess for morning discharge",
+        "transport_delay_reason": "Family pickup delayed (after hours)",
+        "transport_pressure_level": "High"
+      }
+    },
+    "committee_recommendation": "Hold discharge until safety criteria met; initiate UM review and request CMO override to expedite insurance",
+    "human_decision": "Approve",
+    "human_note": "qa",
+    "risk_level": "Critical",
+    "readmission_risk_level": "High",
+    "bed_capacity_impact": "Critical",
+    "memory_insight": "Found 3 similar prior cases. Common prior recommendations included: Hold discharge until safety criteria met.",
+    "discharge_checklist": {
+      "active_blocker_count": 5,
+      "blocker_names": [
+        "Vital signs stable",
+        "Lab stability reviewed",
+        "Insurance authorization",
+        "Social work review",
+        "Family/caregiver pickup or support confirmed"
+      ],
+      "blockers": [
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Vital signs stable",
+          "owner": "Physician",
+          "reason": "Vital signs are unstable.",
+          "recommended_action": "Hold discharge and reassess clinical readiness.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Lab stability reviewed",
+          "owner": "Physician",
+          "reason": "Lab status is unstable.",
+          "recommended_action": "Hold discharge and request physician review.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Insurance authorization",
+          "owner": "Utilization Management",
+          "reason": "Payer authorization is pending.",
+          "recommended_action": "Escalate authorization with payer/UM team.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Social work review",
+          "owner": "Social Worker",
+          "reason": "Social work review is pending.",
+          "recommended_action": "Request social work review for discharge barriers.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Incomplete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Family/caregiver pickup or support confirmed",
+          "owner": "Family / Case Manager",
+          "reason": "Family pickup/caregiver support is pending.",
+          "recommended_action": "Contact family/caregiver and confirm pickup/support plan.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Incomplete"
+        }
+      ],
+      "checklist": [
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Lab stability reviewed",
+          "owner": "Physician",
+          "reason": "Lab status is unstable.",
+          "recommended_action": "Hold discharge and request physician review.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Vital signs stable",
+          "owner": "Physician",
+          "reason": "Vital signs are unstable.",
+          "recommended_action": "Hold discharge and reassess clinical readiness.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Doctor discharge order / signoff",
+          "owner": "Physician",
+          "reason": "Discharge order is signed.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "High",
+          "status": "Complete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Medication reconciliation",
+          "owner": "Pharmacy",
+          "reason": "Medication reconciliation is complete.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Complete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Discharge prescriptions ready",
+          "owner": "Pharmacy",
+          "reason": "Discharge prescriptions are ready or not complex.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Complete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Transport arranged",
+          "owner": "Transport",
+          "reason": "Transport is arranged.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "High",
+          "status": "Complete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Insurance authorization",
+          "owner": "Utilization Management",
+          "reason": "Payer authorization is pending.",
+          "recommended_action": "Escalate authorization with payer/UM team.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Rehab/SNF placement confirmed",
+          "owner": "Case Manager",
+          "reason": "Facility placement is confirmed.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Complete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u26aa Not Required",
+          "item": "Home care setup",
+          "owner": "Case Manager",
+          "reason": "Home care is set up or not needed.",
+          "recommended_action": "No action needed.",
+          "required": false,
+          "severity": "Low",
+          "status": "Not Required"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Social work review",
+          "owner": "Social Worker",
+          "reason": "Social work review is pending.",
+          "recommended_action": "Request social work review for discharge barriers.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Incomplete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Family/caregiver pickup or support confirmed",
+          "owner": "Family / Case Manager",
+          "reason": "Family pickup/caregiver support is pending.",
+          "recommended_action": "Contact family/caregiver and confirm pickup/support plan.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Incomplete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Case manager available",
+          "owner": "Case Manager",
+          "reason": "Case manager is available.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "High",
+          "status": "Complete"
+        }
+      ],
+      "completed_count": 7,
+      "completion_percent": 58,
+      "critical_blocker_count": 3,
+      "high_blocker_count": 0,
+      "medium_blocker_count": 2,
+      "owner_summary": [
+        {
+          "active_blockers": 2,
+          "owner": "Physician"
+        },
+        {
+          "active_blockers": 1,
+          "owner": "Utilization Management"
+        },
+        {
+          "active_blockers": 1,
+          "owner": "Social Worker"
+        },
+        {
+          "active_blockers": 1,
+          "owner": "Family / Case Manager"
+        }
+      ],
+      "readiness_color": "red",
+      "readiness_status": "Not Clinically Ready",
+      "readiness_summary": "Not Clinically Ready: 5 active blocker(s). Top blocker: Vital signs stable owned by Physician (Critical).",
+      "readmission_probability_used": 0.745212733745575,
+      "total_count": 12,
+      "uses_model_outputs": true
+    },
+    "task_snapshot": [],
+    "model_explanations": {
+      "discharge_delay": {
+        "prediction": "Critical delay risk (0.99 probability)",
+        "top_drivers": [
+          {
+            "explanation": "Insurance authorization is a common discharge blocker, especially for facility transfers.",
+            "feature": "insurance_authorization_pending",
+            "model_importance": 0.0805,
+            "patient_value": "Yes",
+            "personalized_score": 0.0805,
+            "rank": 1,
+            "reason": "Insurance authorization pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Clinical instability is a hard safety gate before discharge movement should be expedited.",
+            "feature": "vital_sign_stability_flag_Unstable",
+            "model_importance": 0.0726,
+            "patient_value": "Selected category",
+            "personalized_score": 0.0726,
+            "rank": 2,
+            "reason": "Vital Sign Stability Flag: Unstable",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "This feature had meaningful importance in the trained XGBoost model for discharge delay risk.",
+            "feature": "social_work_pending",
+            "model_importance": 0.0494,
+            "patient_value": "Yes",
+            "personalized_score": 0.0494,
+            "rank": 3,
+            "reason": "Social work review pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Transport readiness determines whether a cleared patient can physically leave the hospital.",
+            "feature": "family_pickup_pending",
+            "model_importance": 0.0337,
+            "patient_value": "Yes",
+            "personalized_score": 0.0337,
+            "rank": 4,
+            "reason": "Family pickup pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Medication work can delay discharge and can also affect discharge delay risk.",
+            "feature": "medication_complexity_Medium",
+            "model_importance": 0.0199,
+            "patient_value": "Selected category",
+            "personalized_score": 0.0199,
+            "rank": 5,
+            "reason": "Medication Complexity: Medium",
+            "signal_type": "Patient-specific active signal"
+          }
+        ]
+      },
+      "expected_delay_hours": {
+        "prediction": "19.8 predicted delay hours",
+        "top_drivers": [
+          {
+            "explanation": "Insurance authorization is a common discharge blocker, especially for facility transfers.",
+            "feature": "insurance_authorization_pending",
+            "model_importance": 0.0977,
+            "patient_value": "Yes",
+            "personalized_score": 0.0977,
+            "rank": 1,
+            "reason": "Insurance authorization pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "This feature had meaningful importance in the trained XGBoost model for expected delay hours.",
+            "feature": "social_work_pending",
+            "model_importance": 0.0599,
+            "patient_value": "Yes",
+            "personalized_score": 0.0599,
+            "rank": 2,
+            "reason": "Social work review pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Clinical instability is a hard safety gate before discharge movement should be expedited.",
+            "feature": "vital_sign_stability_flag_Unstable",
+            "model_importance": 0.0434,
+            "patient_value": "Selected category",
+            "personalized_score": 0.0434,
+            "rank": 3,
+            "reason": "Vital Sign Stability Flag: Unstable",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Clinical instability is a hard safety gate before discharge movement should be expedited.",
+            "feature": "lab_stability_flag_Unstable",
+            "model_importance": 0.0406,
+            "patient_value": "Selected category",
+            "personalized_score": 0.0406,
+            "rank": 4,
+            "reason": "Lab Stability Flag: Unstable",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Transport readiness determines whether a cleared patient can physically leave the hospital.",
+            "feature": "family_pickup_pending",
+            "model_importance": 0.0378,
+            "patient_value": "Yes",
+            "personalized_score": 0.0378,
+            "rank": 5,
+            "reason": "Family pickup pending",
+            "signal_type": "Patient-specific active signal"
+          }
+        ]
+      },
+      "explanation_method": "XGBoost feature-importance + selected-patient active feature values. This is a lightweight explanation, not formal SHAP.",
+      "governance_note": "Use these explanations for decision support and audit review only. They do not replace clinical judgment or validated hospital model governance.",
+      "plain_english_summary": "This case is rated Critical for discharge delay and High for readmission. The strongest visible delay driver is Insurance authorization pending; the strongest visible readmission driver is Insurance authorization pending.",
+      "readmission_risk": {
+        "prediction": "High readmission risk (0.75 probability)",
+        "top_drivers": [
+          {
+            "explanation": "Insurance authorization is a common discharge blocker, especially for facility transfers.",
+            "feature": "insurance_authorization_pending",
+            "model_importance": 0.1592,
+            "patient_value": "Yes",
+            "personalized_score": 0.1592,
+            "rank": 1,
+            "reason": "Insurance authorization pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Hospital capacity pressure increases the operational value of resolving this case quickly.",
+            "feature": "ed_boarding_count",
+            "model_importance": 0.0801,
+            "patient_value": "20",
+            "personalized_score": 0.0801,
+            "rank": 2,
+            "reason": "ED boarding count",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Prior utilization history is a proxy for clinical complexity and post-discharge vulnerability.",
+            "feature": "prior_admissions_6mo",
+            "model_importance": 0.0713,
+            "patient_value": "1",
+            "personalized_score": 0.0713,
+            "rank": 3,
+            "reason": "Prior admissions in last 6 months",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Hospital capacity pressure increases the operational value of resolving this case quickly.",
+            "feature": "current_bed_occupancy_percent",
+            "model_importance": 0.0433,
+            "patient_value": "87%",
+            "personalized_score": 0.0433,
+            "rank": 4,
+            "reason": "Current bed occupancy",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Hospital capacity pressure increases the operational value of resolving this case quickly.",
+            "feature": "ed_wait_time_pressure_Low",
+            "model_importance": 0.039,
+            "patient_value": "Selected category",
+            "personalized_score": 0.039,
+            "rank": 5,
+            "reason": "Ed Wait Time Pressure: Low",
+            "signal_type": "Patient-specific active signal"
+          }
+        ]
+      },
+      "status": "success"
+    }
   }
 ]

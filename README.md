@@ -52,7 +52,7 @@ The application helps an authorized hospital team answer three practical questio
 - [Docker and Railway](#docker-and-railway)
 - [Testing](#testing)
 - [Project structure](#project-structure)
-- [Engineering roadmap](#engineering-roadmap)
+- [Future work](#future-work)
 - [Known limitations](#known-limitations)
 
 ---
@@ -941,45 +941,101 @@ bedflow_ai/
 
 ---
 
-## Engineering roadmap
+## Future work
+
+BedFlow AI is already complete enough to publish as a JSON-backed, single-instance portfolio prototype. The items below are improvements rather than prerequisites for demonstrating the application.
 
 ```mermaid
 flowchart LR
-    NOW["Feature-complete portfolio platform"] --> VALID["Stronger model validation and SHAP"]
-    VALID --> PRESENT["Screenshots, video, and landing page"]
-    PRESENT --> DATA["Optional real operational dataset"]
-    DATA --> ENTERPRISE["Optional enterprise identity and EHR integration"]
+    CURRENT["Current portfolio platform"] --> EVIDENCE["Stronger model evidence"]
+    EVIDENCE --> EXPLAIN["Formal patient-level explainability"]
+    EXPLAIN --> PRESENT["Portfolio presentation"]
+    PRESENT --> DATA["Optional real operational data"]
+    DATA --> ENTERPRISE["Optional enterprise integration"]
 ```
 
-### Model validation and explainability
+### Recommended next priorities
 
-- split readmission evaluation by patient rather than encounter;
-- add probability calibration and precision-recall AUC;
-- perform threshold analysis and uncertainty communication;
+| Priority | Future improvement | Why it matters |
+|---|---|---|
+| 1 | Patient-group validation and probability calibration | Produces a more trustworthy evaluation of the public 30-day readmission model |
+| 2 | Formal SHAP explanations | Shows which features push an individual patient's prediction higher or lower |
+| 3 | Screenshots, demonstration video, and GitHub Pages landing page | Makes the project easier for recruiters and reviewers to understand quickly |
+| 4 | JSON backup, export, restore, and retention tools | Strengthens the persistent single-instance deployment without introducing PostgreSQL |
+| 5 | Stronger real discharge-flow data, when available | Improves the evidence behind the synthetic operational models |
+
+### Model validation and analytical evidence
+
+Planned analytical improvements include:
+
+- split readmission training and evaluation by patient rather than individual encounter;
+- add cross-validation, precision-recall AUC, and confidence intervals where appropriate;
+- calibrate predicted probabilities and compare calibration curves;
+- document operating thresholds for Low, Medium, High, and Critical risk;
+- show confusion matrices and threshold trade-offs;
 - evaluate relevant subgroups and document fairness limitations;
-- replace lightweight importance explanations with formal SHAP;
-- add data-quality and drift monitoring.
+- review every model input for target leakage and post-outcome information;
+- add data-quality and prediction-drift monitoring.
+
+The synthetic discharge-delay classifier and delay-hours regressor will continue to be described as workflow-demonstration models unless stronger operational data becomes available.
+
+### Formal patient-level explainability
+
+The current interface combines native XGBoost importance with active patient signals. A future SHAP implementation would add:
+
+- positive and negative feature contributions for each prediction;
+- baseline risk versus final patient-specific risk;
+- waterfall or force-style visual explanations;
+- separate explanations for delay risk, expected delay hours, and readmission risk;
+- explanation snapshots stored with human-review audit records.
+
+### Persistent JSON operations
+
+PostgreSQL is intentionally deferred. The application will remain JSON-backed for the portfolio version, with one running replica and a persistent Railway volume.
+
+Future JSON-storage improvements may include:
+
+- administrator backup and restore commands;
+- downloadable encrypted archive exports;
+- retention and rotation rules for access logs and simulation history;
+- schema-version metadata for each runtime JSON store;
+- startup validation and automatic repair of safe, recoverable file issues;
+- clearer warnings when `BEDFLOW_DATA_DIR` is not mounted persistently;
+- concurrency guards to prevent overlapping writes within the single app instance.
 
 ### Portfolio presentation
 
-- add application screenshots and a short demonstration video;
-- publish a GitHub Pages landing page;
-- include static diagram images as a fallback for Mermaid rendering;
-- write a concise recruiter-facing project summary.
+Planned presentation work includes:
+
+- screenshots of the bed board, discharge queue, checklist, model explanations, agent review, human decision, simulator, FHIR export, and system operations tabs;
+- a three-to-five-minute demonstration video;
+- a GitHub Pages landing page with live-demo and repository links;
+- static architecture images as a fallback when Mermaid is unavailable;
+- a concise recruiter-facing project summary;
+- example API requests and a downloadable sample FHIR bundle.
 
 ### Optional data strengthening
 
-- retain the public readmission dataset as the strongest analytical component;
-- replace synthetic discharge-flow data only if a suitable public operational dataset becomes available;
-- keep synthetic model metrics clearly labeled as demonstration results.
+The public diabetes readmission dataset remains the strongest real-data analytical component. Future work may replace or supplement the synthetic discharge-flow dataset only if a credible public source includes fields such as:
+
+- discharge blockers and delayed discharge outcomes;
+- placement or post-acute-care availability;
+- insurance authorization;
+- transport readiness;
+- pharmacy and medication-reconciliation readiness;
+- hospital occupancy or bed-turnover activity.
 
 ### Optional enterprise integration
 
-- replace local authentication with SSO or OIDC, MFA, and managed sessions;
-- use HTTPS and production secret management;
-- add SMART on FHIR and validated terminology only for genuine EHR integration.
+These items are outside the current portfolio scope but would be relevant for a genuine hospital deployment:
 
-PostgreSQL is intentionally not part of the current roadmap. The app remains a JSON-backed, single-instance portfolio prototype with optional volume persistence.
+- enterprise SSO or OIDC, managed sessions, and MFA;
+- centralized secret management, encrypted storage, and formal access reviews;
+- SMART on FHIR authorization and validated terminology bindings;
+- live admission-discharge-transfer and electronic health record connectivity;
+- centralized monitoring, alerting, backup, and disaster recovery;
+- clinical validation, model governance, and hospital-approved escalation policies.
+
 
 ---
 
@@ -1016,3 +1072,4 @@ Final discharge readiness remains the responsibility of authorized clinical staf
 <p align="center">
   <strong>BedFlow AI demonstrates how analytics become operational workflow: prediction → explanation → ownership → supervised action → audit → capacity planning.</strong>
 </p>
+
