@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BedFlow AI | Operations Command Center</title>
+    <!-- Google Fonts: Roboto and Google Sans alternative -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Google Core Colors */
+            --google-blue: #4285F4;
+            --google-red: #EA4335;
+            --google-yellow: #FBBC05;
+            --google-green: #34A853;
+            
+            /* Backgrounds & Text */
+            --bg-main: #FFFFFF;
+            --bg-alt: #F8F9FA;
+            --text-primary: #202124;
+            --text-secondary: #5F6368;
+            --border-color: #DADCE0;
+            
+            /* Shadows (Material Design 3 elevation) */
+            --elevation-1: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+            --elevation-2: 0 1px 2px 0 rgba(60,64,67,0.3), 0 2px 6px 2px rgba(60,64,67,0.15);
+            --elevation-3: 0 4px 8px 3px rgba(60,64,67,0.15), 0 1px 3px rgba(60,64,67,0.3);
+            
+            /* Border Radius */
+            --radius-sm: 8px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            --radius-pill: 9999px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h1, h2, h3, h4, h5 {
+            font-family: 'Outfit', sans-serif; /* Close proxy for Google Sans */
+            font-weight: 500;
+            letter-spacing: -0.02em;
+        }
+
+        a {
+            text-decoration: none;
+            color: var(--google-blue);
+        }
+
+        /* Top Navigation */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-main);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-logo {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .nav-logo .g-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .g-dots div {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .dot-blue { background-color: var(--google-blue); }
+        .dot-red { background-color: var(--google-red); }
+        .dot-yellow { background-color: var(--google-yellow); }
+        .dot-green { background-color: var(--google-green); }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        .btn-primary {
+            background-color: var(--google-blue);
+            color: white !important;
+            padding: 10px 24px;
+            border-radius: var(--radius-pill);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 1px 2px 0 rgba(66, 133, 244, 0.3), 0 1px 3px 1px rgba(66, 133, 244, 0.15);
+        }
+
+        .btn-primary:hover {
+            background-color: #1a73e8; /* slightly darker */
+            box-shadow: 0 1px 3px 0 rgba(66, 133, 244, 0.3), 0 4px 8px 3px rgba(66, 133, 244, 0.15);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--google-blue) !important;
+            border: 1px solid var(--border-color);
+            padding: 10px 24px;
+            border-radius: var(--radius-pill);
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background-color: #f1f3f4;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 100px 20px 80px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: clamp(40px, 6vw, 64px);
+            line-height: 1.15;
+            margin-bottom: 24px;
+            color: var(--text-primary);
+        }
+
+        .hero p {
+            font-size: clamp(18px, 3vw, 22px);
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 40px;
+            line-height: 1.5;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-bottom: 60px;
+        }
+
+        .hero-image-wrapper {
+            position: relative;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .hero-image {
+            width: 100%;
+            border-radius: var(--radius-md);
+            box-shadow: var(--elevation-3);
+            background-color: #f1f3f4;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Ensure images fit nicely */
+        .hero-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Features Section */
+        .features-section {
+            background-color: var(--bg-alt);
+            padding: 100px 20px;
+            margin-top: 80px;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto 60px;
+        }
+
+        .section-header h2 {
+            font-size: 36px;
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            font-size: 18px;
+            color: var(--text-secondary);
+        }
+
+        .feature-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+        }
+
+        .feature-card {
+            background: var(--bg-main);
+            border-radius: var(--radius-md);
+            padding: 32px;
+            box-shadow: var(--elevation-1);
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .feature-card:hover {
+            box-shadow: var(--elevation-2);
+            transform: translateY(-2px);
+        }
+
+        .icon-circle {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            font-size: 24px;
+        }
+
+        .icon-blue { background-color: #E8F0FE; color: var(--google-blue); }
+        .icon-red { background-color: #FCE8E6; color: var(--google-red); }
+        .icon-yellow { background-color: #FEF7E0; color: #E37400; /* Darker yellow for contrast */ }
+        .icon-green { background-color: #E6F4EA; color: var(--google-green); }
+
+        .feature-card h3 {
+            font-size: 22px;
+            margin-bottom: 12px;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            flex-grow: 1;
+        }
+
+        /* Analytics Section */
+        .split-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            max-width: 1200px;
+            margin: 100px auto;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .split-content h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .split-content p {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .check-list {
+            list-style: none;
+        }
+
+        .check-list li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            font-size: 16px;
+            color: var(--text-primary);
+        }
+
+        .check-icon {
+            color: var(--google-green);
+            font-weight: bold;
+        }
+
+        .split-image {
+            background-color: var(--bg-alt);
+            border-radius: var(--radius-lg);
+            padding: 40px;
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+        
+        .split-image img {
+            width: 100%;
+            border-radius: var(--radius-sm);
+            box-shadow: var(--elevation-2);
+        }
+
+        /* Notice Banner */
+        .notice-banner {
+            max-width: 900px;
+            margin: 60px auto;
+            background-color: #FCE8E6;
+            border: 1px solid #FAD2CF;
+            border-radius: var(--radius-md);
+            padding: 24px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .notice-icon {
+            font-size: 24px;
+        }
+
+        .notice-text h4 {
+            color: #B31412;
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .notice-text p {
+            color: #A50E0E;
+            font-size: 15px;
+        }
+
+        /* Footer */
+        footer {
+            background-color: var(--bg-alt);
+            padding: 40px 24px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 80px;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .split-section {
+                grid-template-columns: 1fr;
+            }
+            .hero-buttons {
+                flex-direction: column;
+            }
+            .nav-links {
+                display: none; /* Hide on mobile for simplicity */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-logo">
+            <div class="g-dots">
+                <div class="dot-blue"></div>
+                <div class="dot-red"></div>
+                <div class="dot-yellow"></div>
+                <div class="dot-green"></div>
+            </div>
+            BedFlow AI
+        </div>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#architecture">Architecture</a>
+            <a href="#safety">Safety</a>
+            <a href="https://github.com/draculess99" target="_blank" class="btn-primary" style="color: white;">View Source</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1>Hospital flow,<br>orchestrated by AI.</h1>
+        <p>A portfolio-grade hospital operations command center that combines predictive analytics, agentic decision support, capacity simulation, and human accountability.</p>
+        <div class="hero-buttons">
+            <a href="https://github.com/draculess99" class="btn-primary">View on GitHub</a>
+            <a href="#features" class="btn-secondary">Explore Features</a>
+        </div>
+    </section>
+
+    <div class="hero-image-wrapper">
+        <div class="hero-image">
+            <!-- IMPORTANT: User needs to place the image here -->
+            <img src="images/control_tower_dashboard.png" alt="BedFlow AI Command Center Dashboard" onerror="this.src='https://via.placeholder.com/1200x675?text=Control+Tower+Dashboard+Screenshot'">
+        </div>
+    </div>
+
+    <!-- Features Grid -->
+    <section id="features" class="features-section">
+        <div class="section-header">
+            <h2>Smarter operations at every step</h2>
+            <p>From predictive admission queues to a multi-agent debate system, BedFlow AI brings intelligence to hospital logistics.</p>
+        </div>
+
+        <div class="feature-grid">
+            <!-- Card 1 -->
+            <div class="feature-card">
+                <div class="icon-circle icon-blue">🤖</div>
+                <h3>Multi-Agent Committee</h3>
+                <p>A dynamic debate between a Patient Safety Advocate and an Operations Manager, synthesized by a Clinical Director LLM to recommend actionable discharge plans.</p>
+                <a href="#">Learn more &rarr;</a>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="feature-card">
+                <div class="icon-circle icon-red">📊</div>
+                <h3>Predictive Analytics</h3>
+                <p>Three parallel XGBoost models predict 30-day readmission risk, discharge delay probability, and expected delay hours to prioritize the patient queue.</p>
+                <a href="#">Learn more &rarr;</a>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="feature-card">
+                <div class="icon-circle icon-yellow">🔄</div>
+                <h3>Capacity Simulator</h3>
+                <p>Run counterfactual "What-If" scenarios to predict the exact bed-recovery impact of resolving specific hospital blockers (e.g. pharmacy delays, transport shortages).</p>
+                <a href="#">Learn more &rarr;</a>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="feature-card">
+                <div class="icon-circle icon-green">🔗</div>
+                <h3>FHIR Interoperability</h3>
+                <p>Instantly generate standard-compliant FHIR R4 JSON bundles of patient contexts, enabling seamless integration with existing Electronic Health Records (EHR).</p>
+                <a href="#">Learn more &rarr;</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Deep Dive Section -->
+    <section id="architecture" class="split-section">
+        <div class="split-content">
+            <h2>Role-aware accountability built in.</h2>
+            <p>AI should support decisions, not make them automatically. BedFlow AI is designed with strict human-in-the-loop workflows.</p>
+            <ul class="check-list">
+                <li><span class="check-icon">✓</span> Immutable task events and audit logs</li>
+                <li><span class="check-icon">✓</span> Signed local identities and role permissions</li>
+                <li><span class="check-icon">✓</span> Mandatory rationales for clinical overrides</li>
+                <li><span class="check-icon">✓</span> Explainable ML feature importance snapshots</li>
+            </ul>
+        </div>
+        <div class="split-image">
+            <img src="images/task_escalation_workflow.png" alt="Task Workflow" onerror="this.src='https://via.placeholder.com/600x400?text=Task+Workflow+Screenshot'">
+        </div>
+    </section>
+
+    <!-- Safety Notice -->
+    <section id="safety">
+        <div class="notice-banner">
+            <div class="notice-icon">🛡️</div>
+            <div class="notice-text">
+                <h4>Safety Boundary & Data Provenance</h4>
+                <p>BedFlow AI is an educational decision-support demonstration. It does not diagnose, authorize discharge, replace clinical judgment, or connect to a live EHR. No Protected Health Information (PHI) is utilized. Models are trained on a hybrid of synthetic operational scenarios and de-identified public diabetes readmission datasets.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div>
+                <strong>BedFlow AI</strong>
+                <br>Designed and built by Wil Low (Draculess99)
+            </div>
+            <div style="text-align: right;">
+                <a href="https://github.com/draculess99" target="_blank">GitHub</a> • 
+                <a href="https://www.linkedin.com/in/gammaconsult/" target="_blank">LinkedIn</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
