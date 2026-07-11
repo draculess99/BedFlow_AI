@@ -1517,6 +1517,9 @@ with tabs[0]:
                     st.info(f"**📖 RAG Policy Retrieved**: {res['retrieved_policy']}")
                 st.warning(f"**Audit Reasoning**: {res.get('audit_reasoning', 'N/A')}")
                 
+                if res.get("llm_error"):
+                    st.error(f"🚨 **LLM Evaluation Error:**\n\n{res['llm_error']}")
+                
                 if res.get("debate_transcript"):
                     with st.expander("🗣️ View AI Committee Debate Transcript", expanded=False):
                         st.markdown("##### 🩺 Patient Safety Advocate")
