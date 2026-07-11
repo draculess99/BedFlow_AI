@@ -11,10 +11,12 @@ import datetime as _dt
 import json
 import os
 import re
+import uuid
 from collections import Counter, defaultdict
 from typing import Any
 
 TASKS_PATH = "database/tasks.json"
+TASK_EVENTS_PATH = "database/task_events.json"
 
 VALID_STATUSES = [
     "Not Started",
@@ -76,8 +78,83 @@ def _load_raw_tasks() -> list[dict[str, Any]]:
 
 def _save_raw_tasks(tasks: list[dict[str, Any]]) -> None:
     _ensure_store()
-    with open(TASKS_PATH, "w", encoding="utf-8") as f:
+    temp_path = f"{TASKS_PATH}.tmp"
+    with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(tasks, f, indent=2)
+    os.replace(temp_path, TASKS_PATH)
+
+
+def _ensure_event_store() -> None:
+    os.makedirs(os.path.dirname(TASK_EVENTS_PATH), exist_ok=True)
+    if not os.path.exists(TASK_EVENTS_PATH):
+        with open(TASK_EVENTS_PATH, "w", encoding="utf-8") as f:
+            json.dump([], f, indent=2)
+
+
+def _load_task_events() -> list[dict[str, Any]]:
+    _ensure_event_store()
+    try:
+        with open(TASK_EVENTS_PATH, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        return payload if isinstance(payload, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def _append_task_event(event: dict[str, Any]) -> dict[str, Any]:
+    events = _load_task_events()
+    events.append(event)
+    temp_path = f"{TASK_EVENTS_PATH}.tmp"
+    with open(temp_path, "w", encoding="utf-8") as f:
+        json.dump(events, f, indent=2)
+    os.replace(temp_path, TASK_EVENTS_PATH)
+    return event
+
+
+def record_task_event(
+    task: dict[str, Any],
+    event_type: str,
+    old_status: str | None = None,
+    new_status: str | None = None,
+    note: str = "",
+    actor_name: str = "System",
+    actor_role: str = "System",
+    actor_user_id: str | None = None,
+) -> dict[str, Any]:
+    """Append an immutable task lifecycle event."""
+    event = {
+        "event_id": f"TEVT-{uuid.uuid4().hex[:16].upper()}",
+        "timestamp_utc": _iso_now(),
+        "event_type": event_type,
+        "task_id": task.get("task_id"),
+        "patient_id": task.get("patient_id"),
+        "task_type": task.get("task_type"),
+        "owner_role": task.get("owner_role"),
+        "old_status": old_status,
+        "new_status": new_status,
+        "note": note,
+        "actor_name": actor_name,
+        "actor_role": actor_role,
+        "actor_user_id": actor_user_id,
+    }
+    return _append_task_event(event)
+
+
+def list_task_events(
+    patient_id: str | None = None,
+    task_id: str | None = None,
+    actor_role: str | None = None,
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    events = _load_task_events()
+    if patient_id:
+        events = [event for event in events if str(event.get("patient_id")) == str(patient_id)]
+    if task_id:
+        events = [event for event in events if str(event.get("task_id")) == str(task_id)]
+    if actor_role and actor_role != "All":
+        events = [event for event in events if str(event.get("actor_role")) == str(actor_role)]
+    events.sort(key=lambda event: str(event.get("timestamp_utc", "")), reverse=True)
+    return events[: max(1, min(int(limit), 5000))]
 
 
 def _now_utc() -> _dt.datetime:
@@ -266,7 +343,18 @@ def sync_tasks_from_checklist(patient_data: dict[str, Any], checklist: dict[str,
             refreshed += 1
         else:
             created += 1
-        existing_by_id[task_id] = _task_from_blocker(patient_data, blocker, previous)
+        task = _task_from_blocker(patient_data, blocker, previous)
+        existing_by_id[task_id] = task
+        if not previous:
+            record_task_event(
+                task,
+                event_type="Task Created",
+                old_status=None,
+                new_status=task.get("status"),
+                note="Created from discharge-readiness checklist blocker.",
+                actor_name="BedFlow Workflow Engine",
+                actor_role="System",
+            )
         task_ids_for_patient.add(task_id)
 
     merged = list(existing_by_id.values())
@@ -283,7 +371,14 @@ def sync_tasks_from_checklist(patient_data: dict[str, Any], checklist: dict[str,
     }
 
 
-def update_task_status(task_id: str, status: str, note: str = "", updated_by: str = "Bed Manager") -> dict[str, Any]:
+def update_task_status(
+    task_id: str,
+    status: str,
+    note: str = "",
+    updated_by: str = "Bed Manager",
+    updated_by_role: str | None = None,
+    updated_by_user_id: str | None = None,
+) -> dict[str, Any]:
     if status not in VALID_STATUSES:
         raise ValueError(f"Invalid status '{status}'. Valid statuses: {', '.join(VALID_STATUSES)}")
 
@@ -291,12 +386,17 @@ def update_task_status(task_id: str, status: str, note: str = "", updated_by: st
     now = _iso_now()
     found = False
     updated_task: dict[str, Any] | None = None
+    old_status: str | None = None
 
     for task in raw_tasks:
         if task.get("task_id") == task_id:
             found = True
+            old_status = str(task.get("status", "Pending"))
             task["status"] = status
             task["updated_at"] = now
+            task["last_updated_by"] = updated_by
+            task["last_updated_by_role"] = updated_by_role or updated_by
+            task["last_updated_by_user_id"] = updated_by_user_id
             if status == "Completed":
                 task["completed_at"] = now
             elif status in ACTIVE_STATUSES:
@@ -308,6 +408,8 @@ def update_task_status(task_id: str, status: str, note: str = "", updated_by: st
                     {
                         "timestamp": now,
                         "updated_by": updated_by,
+                        "updated_by_role": updated_by_role or updated_by,
+                        "updated_by_user_id": updated_by_user_id,
                         "status": status,
                         "note": note,
                     }
@@ -319,6 +421,17 @@ def update_task_status(task_id: str, status: str, note: str = "", updated_by: st
         raise KeyError(f"Task not found: {task_id}")
 
     _save_raw_tasks(raw_tasks)
+    if updated_task:
+        record_task_event(
+            updated_task,
+            event_type="Status Updated",
+            old_status=old_status,
+            new_status=status,
+            note=note,
+            actor_name=updated_by,
+            actor_role=updated_by_role or updated_by,
+            actor_user_id=updated_by_user_id,
+        )
     return updated_task or {}
 
 

@@ -1,8 +1,10 @@
-from flask import Flask, jsonify, request
+from flask import Flask, Response, g, jsonify, request
 import pandas as pd
 import json
 import os
 import threading
+import csv
+import io
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,6 +20,20 @@ from .committee import (
 )
 from .memory import get_memory_state, append_memory_history, find_similar_bedflow_events
 from .audit import log_human_decision, get_audit_log
+from .auth import (
+    auth_status,
+    authenticate,
+    can_save_decision,
+    can_update_task,
+    get_access_log,
+    has_permission,
+    issue_token,
+    list_public_demo_users,
+    record_access_event,
+    require_auth,
+    require_permission,
+    sanitize_user,
+)
 from .command_center import build_hospital_capacity_snapshot, build_discharge_queue
 from .discharge_checklist import build_discharge_checklist
 from .fhir_adapter import build_fhir_bundle, summarize_bundle
@@ -27,6 +43,7 @@ from .tasks import (
     update_task_status,
     get_overdue_tasks,
     summarize_tasks,
+    list_task_events,
 )
 
 app = Flask(__name__)
@@ -66,9 +83,67 @@ def health():
         "model_version": bedflow_models.model_version,
         "model_source": "saved artifact" if bedflow_models.loaded_from_artifact else "in-memory model",
         "dataset_ready": os.path.exists(DATA_PATH),
+        "authentication": auth_status(),
     })
 
+@app.route("/api/auth/demo_users", methods=["GET"])
+def auth_demo_users():
+    """List non-sensitive local demo identities for the Stage 8 login screen."""
+    return jsonify({
+        "status": "success",
+        "users": list_public_demo_users(),
+        "mode": "local-demo-rbac",
+        "default_password_hint": "BEDFLOW_DEMO_PASSWORD or BedFlowDemo!",
+        "production_ready": False,
+    })
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def auth_login():
+    data = request.json or {}
+    user = authenticate(data.get("username", ""), data.get("password", ""))
+    if not user:
+        return jsonify({"status": "error", "message": "Invalid username or password"}), 401
+    public_user = sanitize_user(user)
+    return jsonify({
+        "status": "success",
+        "token": issue_token(user),
+        "user": public_user,
+        "expires_in_seconds": auth_status().get("token_max_age_seconds"),
+    })
+
+
+@app.route("/api/auth/me", methods=["GET"])
+@require_auth
+def auth_me():
+    return jsonify({"status": "success", "user": g.bedflow_user})
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+@require_auth
+def auth_logout():
+    record_access_event("logout", user=g.bedflow_user, outcome="success")
+    return jsonify({"status": "success", "message": "Local demo token discarded by client"})
+
+
+@app.route("/api/auth/role_matrix", methods=["GET"])
+def auth_role_matrix():
+    users = list_public_demo_users()
+    return jsonify({
+        "status": "success",
+        "roles": [
+            {
+                "role": user.get("role"),
+                "permissions": user.get("permissions", []),
+                "allowed_decisions": user.get("allowed_decisions", []),
+            }
+            for user in users
+        ],
+    })
+
+
 @app.route("/api/train_models", methods=["POST"])
+@require_permission("model.train")
 def train():
     """Train all models and publish versioned model artifacts for Stage 5 governance."""
     try:
@@ -93,6 +168,7 @@ def model_governance():
 
 
 @app.route("/api/load_latest_model", methods=["POST"])
+@require_permission("model.manage")
 def load_latest_model():
     """Load the latest saved model artifacts into the running backend process."""
     try:
@@ -239,6 +315,7 @@ def model_feature_importance():
 
 
 @app.route("/api/fhir/bundle", methods=["POST"])
+@require_permission("fhir.export")
 def fhir_bundle():
     """Build a de-identified FHIR R4-shaped collection bundle for one patient case."""
     data = request.json or {}
@@ -299,6 +376,7 @@ def overdue_tasks():
 
 
 @app.route("/api/tasks/sync", methods=["POST"])
+@require_auth
 def sync_tasks():
     """Create or refresh workflow tasks from one patient's checklist blockers."""
     data = request.json or {}
@@ -314,6 +392,7 @@ def sync_tasks():
 
 
 @app.route("/api/tasks/sync_all", methods=["POST"])
+@require_permission("task.sync")
 def sync_all_tasks():
     """Create or refresh workflow tasks for the top patients in the demo dataset."""
     if not os.path.exists(DATA_PATH):
@@ -356,15 +435,46 @@ def sync_all_tasks():
 
 
 @app.route("/api/tasks/update_status", methods=["POST"])
+@require_auth
 def update_task():
-    """Update one task's status and optional note."""
+    """Update one task with backend-enforced role ownership."""
     data = request.json or {}
+    task_id = data.get("task_id")
+    existing = next((task for task in list_tasks() if task.get("task_id") == task_id), None)
+    if not existing:
+        return jsonify({"status": "error", "message": f"Task not found: {task_id}"}), 404
+    if not can_update_task(g.bedflow_user, existing):
+        record_access_event(
+            "task_update",
+            user=g.bedflow_user,
+            outcome="denied",
+            detail=f"Task is owned by {existing.get('owner_role')}",
+            patient_id=existing.get("patient_id"),
+            task_id=task_id,
+        )
+        return jsonify({
+            "status": "error",
+            "message": (
+                f"Role '{g.bedflow_user.get('role')}' cannot update a task owned by "
+                f"'{existing.get('owner_role')}'."
+            ),
+        }), 403
     try:
         task = update_task_status(
-            task_id=data.get("task_id"),
+            task_id=task_id,
             status=data.get("status"),
             note=data.get("note", ""),
-            updated_by=data.get("updated_by", "Bed Manager"),
+            updated_by=g.bedflow_user.get("display_name", "Authenticated user"),
+            updated_by_role=g.bedflow_user.get("role"),
+            updated_by_user_id=g.bedflow_user.get("user_id"),
+        )
+        record_access_event(
+            "task_update",
+            user=g.bedflow_user,
+            outcome="success",
+            detail=f"Status changed to {task.get('status')}",
+            patient_id=task.get("patient_id"),
+            task_id=task_id,
         )
         return jsonify({"status": "success", "task": task})
     except Exception as e:
@@ -376,6 +486,21 @@ def update_task():
 def patient_tasks(patient_id):
     """Return all workflow tasks for a selected patient."""
     return jsonify(list_tasks(patient_id=patient_id))
+
+@app.route("/api/tasks/events", methods=["GET"])
+@require_permission("audit.read")
+def task_events():
+    try:
+        limit = int(request.args.get("limit", 500))
+    except (TypeError, ValueError):
+        limit = 500
+    return jsonify(list_task_events(
+        patient_id=request.args.get("patient_id"),
+        task_id=request.args.get("task_id"),
+        actor_role=request.args.get("actor_role"),
+        limit=limit,
+    ))
+
 
 @app.route("/api/predict_patient", methods=["POST"])
 def predict():
@@ -437,16 +562,27 @@ def memory_state():
     return jsonify(get_memory_state())
 
 @app.route("/api/save_human_decision", methods=["POST"])
+@require_permission("decision.save")
 def save_decision():
     data = request.json or {}
     decision = str(data.get("human_decision", "")).strip()
     note = str(data.get("human_note", "")).strip()
-    reviewer_name = str(data.get("reviewer_name", "")).strip()
-    reviewer_role = str(data.get("reviewer_role", "")).strip()
+    reviewer_name = str(g.bedflow_user.get("display_name", "")).strip()
+    reviewer_role = str(g.bedflow_user.get("role", "")).strip()
     if not data.get("patient_id") or not decision:
         return jsonify({"status": "error", "message": "patient_id and human_decision are required"}), 400
-    if not reviewer_name or not reviewer_role:
-        return jsonify({"status": "error", "message": "Reviewer name and role are required for the audit record"}), 400
+    if not can_save_decision(g.bedflow_user, decision):
+        record_access_event(
+            "human_decision",
+            user=g.bedflow_user,
+            outcome="denied",
+            detail=f"Decision '{decision}' is not permitted for this role",
+            patient_id=data.get("patient_id"),
+        )
+        return jsonify({
+            "status": "error",
+            "message": f"Role '{reviewer_role}' is not permitted to record action '{decision}'.",
+        }), 403
     if decision in {"Override", "Escalate to Case Manager", "Hold"} and not note:
         return jsonify({"status": "error", "message": "A reason is required for override, escalation, or hold decisions"}), 400
     try:
@@ -463,6 +599,8 @@ def save_decision():
             model_explanations=data.get("model_explanations"),
             reviewer_name=reviewer_name,
             reviewer_role=reviewer_role,
+            reviewer_user_id=g.bedflow_user.get("user_id"),
+            authentication_source="local-demo-rbac",
             model_version=(data.get("model_outputs") or {}).get("model_version") or bedflow_models.model_version,
         )
         
@@ -486,14 +624,61 @@ def save_decision():
             "memory_reasoning": "Appended from human decision."
         }
         append_memory_history(history_record)
+        record_access_event(
+            "human_decision",
+            user=g.bedflow_user,
+            outcome="success",
+            detail=f"Recorded {decision}",
+            patient_id=data.get("patient_id"),
+        )
         
         return jsonify({"status": "success", "record": record})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/audit_log", methods=["GET"])
+@require_permission("audit.read")
 def audit():
     return jsonify(get_audit_log())
+
+
+@app.route("/api/audit/export.csv", methods=["GET"])
+@require_permission("audit.export")
+def audit_export_csv():
+    records = get_audit_log()
+    output = io.StringIO()
+    fieldnames = [
+        "audit_id",
+        "timestamp_utc",
+        "patient_id",
+        "reviewer_user_id",
+        "reviewer_name",
+        "reviewer_role",
+        "human_decision",
+        "human_note",
+        "committee_recommendation",
+        "risk_level",
+        "readmission_risk_level",
+        "model_version",
+        "authentication_source",
+    ]
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for record in records:
+        writer.writerow(record)
+    record_access_event("audit_export", user=g.bedflow_user, outcome="success", detail=f"Exported {len(records)} records")
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=bedflow_audit_export.csv"},
+    )
+
+
+@app.route("/api/access_log", methods=["GET"])
+@require_permission("access.read")
+def access_log():
+    return jsonify(get_access_log())
+
 
 if __name__ == "__main__":
     host = os.getenv("BEDFLOW_API_HOST", "127.0.0.1")

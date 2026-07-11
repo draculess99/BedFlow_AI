@@ -28,3 +28,14 @@
 ### Security
 
 - Release packages should exclude `.env`, `.git`, caches, and local secrets.
+
+## Stage 8 — Authenticated Role-Based Workflow
+
+- Added local demo users with hashed passwords and signed bearer tokens.
+- Added backend permission enforcement for model operations, task ownership, human decisions, audit export, and access-log viewing.
+- Bound reviewer identity to the authenticated token instead of trusting UI fields.
+- Added role-specific decision options.
+- Added immutable task lifecycle events.
+- Added administrator CSV audit export and access-event logging.
+- Added Streamlit sign-in/sign-out controls and permission-aware actions.
+- Added Stage 8 documentation and expanded automated tests to 10 passing tests.

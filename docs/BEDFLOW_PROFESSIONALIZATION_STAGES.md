@@ -107,24 +107,30 @@ Implemented after Stage 7:
 - expanded tests;
 - modernized README and model terminology.
 
-## Stage 8 — Full Role-Based Workflow ⏳
+## Stage 8 — Authenticated Role-Based Workflow ✅
 
-Foundation implemented:
+Implemented:
 
-- reviewer name;
-- reviewer role;
-- mandatory exception rationale;
-- role filter in audit view.
-
-Still required:
-
-- authenticated login;
-- identity-provider integration;
-- backend-enforced permissions;
-- role-specific task actions;
+- local demo users with password hashes;
+- signed, time-limited bearer tokens;
+- backend-enforced role permissions;
+- Administrator-only model operations;
+- role-owned task updates;
+- Bed Manager/Administrator cross-role task supervision;
+- role-specific final decision actions;
+- identity-bound audit records;
 - immutable task event history;
-- administrator audit exports;
-- session and access logging.
+- Administrator audit CSV export;
+- access-event logging;
+- Streamlit sign-in, sign-out, identity, and permission display.
+
+Production hardening still required outside the portfolio stage:
+
+- enterprise SSO/OIDC or SAML;
+- MFA and account lifecycle controls;
+- HTTPS and managed secret rotation;
+- database-backed identities and sessions;
+- centralized immutable audit storage.
 
 ## Stage 9 — Capacity What-If Simulator ⏳
 
@@ -156,4 +162,4 @@ Recommended features:
 
 ## Recommended next implementation
 
-Build **Stage 8 full role-based workflow**, beginning with backend permission enforcement and authenticated user identity. Then implement the **Stage 9 capacity what-if simulator**, which will add the strongest new operational capability.
+Build the **Stage 9 capacity what-if simulator** next. Stage 8 now supplies the authenticated identity and permission layer needed to attribute saved simulations and operational actions.

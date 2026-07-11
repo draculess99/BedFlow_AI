@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import os
+import uuid
 from typing import Any
 
 AUDIT_LOG_PATH = "database/audit_log.json"
@@ -52,18 +53,23 @@ def log_human_decision(
     model_explanations: dict[str, Any] | None = None,
     reviewer_name: str = "",
     reviewer_role: str = "",
+    reviewer_user_id: str | None = None,
+    authentication_source: str = "local-demo-rbac",
     model_version: str | None = None,
 ) -> dict[str, Any]:
     now = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
     model_outputs = model_outputs or {}
     research_outputs = research_outputs or {}
     record = {
+        "audit_id": f"AUD-{uuid.uuid4().hex[:16].upper()}",
         "timestamp_utc": now,
         # Backward-compatible display field used by older dashboards.
         "timestamp": now,
         "patient_id": patient_id,
         "reviewer_name": reviewer_name,
         "reviewer_role": reviewer_role,
+        "reviewer_user_id": reviewer_user_id,
+        "authentication_source": authentication_source,
         "model_version": model_version or model_outputs.get("model_version"),
         "model_outputs": model_outputs,
         "research_outputs": research_outputs,

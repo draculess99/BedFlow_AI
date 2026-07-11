@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from backend.audit import log_human_decision
+from backend.auth import DEFAULT_DEMO_PASSWORD
 
 
-def test_audit_record_contains_reviewer_and_model_version(tmp_path, monkeypatch):
+def test_audit_record_contains_authenticated_reviewer_and_model_version(tmp_path, monkeypatch):
     audit_path = tmp_path / "audit.json"
     monkeypatch.setattr("backend.audit.AUDIT_LOG_PATH", str(audit_path))
 
@@ -17,16 +18,31 @@ def test_audit_record_contains_reviewer_and_model_version(tmp_path, monkeypatch)
         memory_insight="No similar case.",
         reviewer_name="Alex Morgan",
         reviewer_role="Bed Manager",
+        reviewer_user_id="USR-TEST",
+        authentication_source="local-demo-rbac",
         model_version="model-test-1",
     )
 
+    assert record["audit_id"].startswith("AUD-")
     assert record["reviewer_name"] == "Alex Morgan"
     assert record["reviewer_role"] == "Bed Manager"
+    assert record["reviewer_user_id"] == "USR-TEST"
+    assert record["authentication_source"] == "local-demo-rbac"
     assert record["model_version"] == "model-test-1"
     assert record["timestamp_utc"].endswith("+00:00")
 
 
-def test_api_rejects_unattributed_or_unexplained_exception_decisions():
+def _login(client, username="bedmanager"):
+    response = client.post(
+        "/api/auth/login",
+        json={"username": username, "password": DEFAULT_DEMO_PASSWORD},
+    )
+    assert response.status_code == 200
+    token = response.get_json()["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_api_requires_authentication_and_exception_rationale():
     from backend.api import app
 
     client = app.test_client()
@@ -37,11 +53,27 @@ def test_api_rejects_unattributed_or_unexplained_exception_decisions():
         "research_outputs": {},
     }
 
-    missing_identity = client.post("/api/save_human_decision", json=base)
-    assert missing_identity.status_code == 400
+    missing_auth = client.post("/api/save_human_decision", json=base)
+    assert missing_auth.status_code == 401
 
-    missing_reason = client.post(
-        "/api/save_human_decision",
-        json={**base, "reviewer_name": "Alex", "reviewer_role": "Bed Manager"},
-    )
+    headers = _login(client)
+    missing_reason = client.post("/api/save_human_decision", json=base, headers=headers)
     assert missing_reason.status_code == 400
+
+
+def test_role_cannot_record_unpermitted_decision():
+    from backend.api import app
+
+    client = app.test_client()
+    nurse_headers = _login(client, "nurse")
+    response = client.post(
+        "/api/save_human_decision",
+        json={
+            "patient_id": "P-TEST",
+            "human_decision": "Approve",
+            "model_outputs": {},
+            "research_outputs": {},
+        },
+        headers=nurse_headers,
+    )
+    assert response.status_code == 403

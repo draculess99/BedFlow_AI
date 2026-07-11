@@ -1,57 +1,651 @@
 [
-    {
-        "timestamp": "2026-07-10 17:51:13.051088",
-        "patient_id": "PT0000",
-        "model_outputs": {
-            "delay_risk_level": "High",
-            "discharge_delay_risk_probability": 0.5900468826293945,
-            "predicted_delay_hours": 11.2,
-            "readmission_risk_level": "Critical",
-            "readmission_risk_probability": 0.9999315738677979
+  {
+    "timestamp": "2026-07-10 17:51:13.051088",
+    "patient_id": "PT0000",
+    "model_outputs": {
+      "delay_risk_level": "High",
+      "discharge_delay_risk_probability": 0.5900468826293945,
+      "predicted_delay_hours": 11.2,
+      "readmission_risk_level": "Critical",
+      "readmission_risk_probability": 0.9999315738677979
+    },
+    "research_outputs": {
+      "bed_capacity": {
+        "bed_pressure_level": "Critical",
+        "ed_boarding_relief_level": "Critical",
+        "estimated_bed_recovery_value": "High (Boarding Relief)",
+        "recommended_action": "Prioritize this discharge to open bed for ED boarder"
+      },
+      "home_care": {
+        "home_care_delay_reason": "Cleared",
+        "home_care_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "insurance": {
+        "insurance_delay_reason": "Facility auth pending",
+        "insurance_pressure_level": "Critical",
+        "recommended_action": "Urgent review by utilization management"
+      },
+      "pharmacy": {
+        "pharmacy_delay_reason": "Cleared",
+        "pharmacy_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "rehab": {
+        "placement_delay_reason": "Placement secured",
+        "placement_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "safety": {
+        "patient_safety_level": "High",
+        "recommended_action": "Ensure post-discharge appointments and support are locked in.",
+        "safety_reason": "High readmission risk"
+      },
+      "transport": {
+        "recommended_action": "Verify EMS/Transport ETA",
+        "transport_delay_reason": "Facility transport pending",
+        "transport_pressure_level": "High"
+      }
+    },
+    "committee_recommendation": "Case manager review required",
+    "human_decision": "Approve",
+    "human_note": "",
+    "risk_level": "High",
+    "bed_capacity_impact": "Critical",
+    "memory_insight": "No closely matching prior bed-flow memory event was found."
+  },
+  {
+    "audit_id": "AUD-557A292B568040F3",
+    "timestamp_utc": "2026-07-11T06:46:42+00:00",
+    "timestamp": "2026-07-11T06:46:42+00:00",
+    "patient_id": "PT0472",
+    "reviewer_name": "Demo Administrator",
+    "reviewer_role": "Administrator",
+    "reviewer_user_id": "USR-6A26BCD3F118",
+    "authentication_source": "local-demo-rbac",
+    "model_version": "bedflow-xgb-20260711T055014Z",
+    "model_outputs": {
+      "delay_risk_level": "Critical",
+      "discharge_delay_risk_probability": 0.9876976609230042,
+      "model_version": "bedflow-xgb-20260711T055014Z",
+      "predicted_delay_hours": 24.2,
+      "prediction_source": "saved XGBoost artifacts",
+      "prediction_timestamp_utc": "2026-07-11T06:43:48+00:00",
+      "readmission_risk_level": "High",
+      "readmission_risk_probability": 0.7353061437606812
+    },
+    "research_outputs": {
+      "bed_capacity": {
+        "bed_pressure_level": "Critical",
+        "ed_boarding_relief_level": "Critical",
+        "estimated_bed_recovery_value": "High (Boarding Relief)",
+        "recommended_action": "Prioritize this discharge to open bed for ED boarder"
+      },
+      "home_care": {
+        "home_care_delay_reason": "Cleared",
+        "home_care_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "insurance": {
+        "insurance_delay_reason": "Cleared",
+        "insurance_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "pharmacy": {
+        "pharmacy_delay_reason": "Cleared",
+        "pharmacy_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "rehab": {
+        "placement_delay_reason": "N/A",
+        "placement_pressure_level": "Low",
+        "recommended_action": "None"
+      },
+      "safety": {
+        "patient_safety_level": "High",
+        "recommended_action": "Ensure post-discharge appointments and support are locked in.",
+        "safety_reason": "High readmission risk"
+      },
+      "transport": {
+        "recommended_action": "Verify EMS/Transport ETA",
+        "transport_delay_reason": "Facility transport pending",
+        "transport_pressure_level": "High"
+      }
+    },
+    "committee_recommendation": "Hold discharge until safety criteria met",
+    "human_decision": "Approve",
+    "human_note": "appove ai as admin",
+    "risk_level": "Critical",
+    "readmission_risk_level": "High",
+    "bed_capacity_impact": "Critical",
+    "memory_insight": "No closely matching prior bed-flow memory event was found.",
+    "discharge_checklist": {
+      "active_blocker_count": 5,
+      "blocker_names": [
+        "Rehab/SNF placement confirmed",
+        "Lab stability reviewed",
+        "Transport arranged",
+        "Case manager available",
+        "Social work review"
+      ],
+      "blockers": [
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Rehab/SNF placement confirmed",
+          "owner": "Case Manager",
+          "reason": "Rehab/SNF placement is still pending.",
+          "recommended_action": "Escalate facility bed search/placement.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
         },
-        "research_outputs": {
-            "bed_capacity": {
-                "bed_pressure_level": "Critical",
-                "ed_boarding_relief_level": "Critical",
-                "estimated_bed_recovery_value": "High (Boarding Relief)",
-                "recommended_action": "Prioritize this discharge to open bed for ED boarder"
-            },
-            "home_care": {
-                "home_care_delay_reason": "Cleared",
-                "home_care_pressure_level": "Low",
-                "recommended_action": "None"
-            },
-            "insurance": {
-                "insurance_delay_reason": "Facility auth pending",
-                "insurance_pressure_level": "Critical",
-                "recommended_action": "Urgent review by utilization management"
-            },
-            "pharmacy": {
-                "pharmacy_delay_reason": "Cleared",
-                "pharmacy_pressure_level": "Low",
-                "recommended_action": "None"
-            },
-            "rehab": {
-                "placement_delay_reason": "Placement secured",
-                "placement_pressure_level": "Low",
-                "recommended_action": "None"
-            },
-            "safety": {
-                "patient_safety_level": "High",
-                "recommended_action": "Ensure post-discharge appointments and support are locked in.",
-                "safety_reason": "High readmission risk"
-            },
-            "transport": {
-                "recommended_action": "Verify EMS/Transport ETA",
-                "transport_delay_reason": "Facility transport pending",
-                "transport_pressure_level": "High"
-            }
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Lab stability reviewed",
+          "owner": "Physician",
+          "reason": "Lab status is unstable.",
+          "recommended_action": "Hold discharge and request physician review.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
         },
-        "committee_recommendation": "Case manager review required",
-        "human_decision": "Approve",
-        "human_note": "",
-        "risk_level": "High",
-        "bed_capacity_impact": "Critical",
-        "memory_insight": "No closely matching prior bed-flow memory event was found."
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Transport arranged",
+          "owner": "Transport",
+          "reason": "Transport or facility transfer is pending.",
+          "recommended_action": "Confirm transport ETA or facility pickup.",
+          "required": true,
+          "severity": "High",
+          "status": "Incomplete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Case manager available",
+          "owner": "Case Manager",
+          "reason": "Case manager is unavailable.",
+          "recommended_action": "Assign case manager coverage or escalate to bed-flow lead.",
+          "required": true,
+          "severity": "High",
+          "status": "Incomplete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Social work review",
+          "owner": "Social Worker",
+          "reason": "Social work review is pending.",
+          "recommended_action": "Request social work review for discharge barriers.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Incomplete"
+        }
+      ],
+      "checklist": [
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Lab stability reviewed",
+          "owner": "Physician",
+          "reason": "Lab status is unstable.",
+          "recommended_action": "Hold discharge and request physician review.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Vital signs stable",
+          "owner": "Physician",
+          "reason": "Vital signs are stable.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Complete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Doctor discharge order / signoff",
+          "owner": "Physician",
+          "reason": "Discharge order is signed.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "High",
+          "status": "Complete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Medication reconciliation",
+          "owner": "Pharmacy",
+          "reason": "Medication reconciliation is complete.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Complete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Discharge prescriptions ready",
+          "owner": "Pharmacy",
+          "reason": "Discharge prescriptions are ready or not complex.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Complete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Transport arranged",
+          "owner": "Transport",
+          "reason": "Transport or facility transfer is pending.",
+          "recommended_action": "Confirm transport ETA or facility pickup.",
+          "required": true,
+          "severity": "High",
+          "status": "Incomplete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u2705 Complete",
+          "item": "Insurance authorization",
+          "owner": "Utilization Management",
+          "reason": "Authorization is clear.",
+          "recommended_action": "No action needed.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Complete"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Rehab/SNF placement confirmed",
+          "owner": "Case Manager",
+          "reason": "Rehab/SNF placement is still pending.",
+          "recommended_action": "Escalate facility bed search/placement.",
+          "required": true,
+          "severity": "Critical",
+          "status": "Incomplete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u26aa Not Required",
+          "item": "Home care setup",
+          "owner": "Case Manager",
+          "reason": "Home care is set up or not needed.",
+          "recommended_action": "No action needed.",
+          "required": false,
+          "severity": "Low",
+          "status": "Not Required"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Social work review",
+          "owner": "Social Worker",
+          "reason": "Social work review is pending.",
+          "recommended_action": "Request social work review for discharge barriers.",
+          "required": true,
+          "severity": "Medium",
+          "status": "Incomplete"
+        },
+        {
+          "complete": true,
+          "display_status": "\u26aa Not Required",
+          "item": "Family/caregiver pickup or support confirmed",
+          "owner": "Family / Case Manager",
+          "reason": "Family/caregiver support is confirmed or not needed.",
+          "recommended_action": "No action needed.",
+          "required": false,
+          "severity": "Low",
+          "status": "Not Required"
+        },
+        {
+          "complete": false,
+          "display_status": "\u274c Incomplete",
+          "item": "Case manager available",
+          "owner": "Case Manager",
+          "reason": "Case manager is unavailable.",
+          "recommended_action": "Assign case manager coverage or escalate to bed-flow lead.",
+          "required": true,
+          "severity": "High",
+          "status": "Incomplete"
+        }
+      ],
+      "completed_count": 7,
+      "completion_percent": 58,
+      "critical_blocker_count": 2,
+      "high_blocker_count": 2,
+      "medium_blocker_count": 1,
+      "owner_summary": [
+        {
+          "active_blockers": 2,
+          "owner": "Case Manager"
+        },
+        {
+          "active_blockers": 1,
+          "owner": "Physician"
+        },
+        {
+          "active_blockers": 1,
+          "owner": "Transport"
+        },
+        {
+          "active_blockers": 1,
+          "owner": "Social Worker"
+        }
+      ],
+      "readiness_color": "red",
+      "readiness_status": "Not Clinically Ready",
+      "readiness_summary": "Not Clinically Ready: 5 active blocker(s). Top blocker: Rehab/SNF placement confirmed owned by Case Manager (Critical).",
+      "readmission_probability_used": 0.7353061437606812,
+      "total_count": 12,
+      "uses_model_outputs": true
+    },
+    "task_snapshot": [
+      {
+        "completed_at": null,
+        "created_at": "2026-07-11T06:43:41+00:00",
+        "diagnosis_group": "General Medicine",
+        "due_at": "2026-07-11T09:43:41+00:00",
+        "escalation_level": "Critical",
+        "is_active": true,
+        "minutes_until_due": 179,
+        "minutes_waiting": 0,
+        "notes": [],
+        "overdue": false,
+        "owner_role": "Case Manager",
+        "patient_id": "PT0472",
+        "reason": "Rehab/SNF placement is still pending.",
+        "recommended_action": "Escalate facility bed search/placement.",
+        "severity": "Critical",
+        "sla_minutes": 180,
+        "source": "Discharge Readiness Checklist",
+        "source_checklist_item": "Rehab/SNF placement confirmed",
+        "status": "Pending",
+        "task_id": "TASK-PT0472-rehab-snf-placement-confirmed",
+        "task_type": "Rehab/SNF placement confirmed",
+        "unit": "Med/Surg",
+        "updated_at": "2026-07-11T06:43:41+00:00"
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-07-11T06:43:41+00:00",
+        "diagnosis_group": "General Medicine",
+        "due_at": "2026-07-11T07:43:41+00:00",
+        "escalation_level": "Critical",
+        "is_active": true,
+        "minutes_until_due": 59,
+        "minutes_waiting": 0,
+        "notes": [],
+        "overdue": false,
+        "owner_role": "Physician",
+        "patient_id": "PT0472",
+        "reason": "Lab status is unstable.",
+        "recommended_action": "Hold discharge and request physician review.",
+        "severity": "Critical",
+        "sla_minutes": 60,
+        "source": "Discharge Readiness Checklist",
+        "source_checklist_item": "Lab stability reviewed",
+        "status": "Pending",
+        "task_id": "TASK-PT0472-lab-stability-reviewed",
+        "task_type": "Lab stability reviewed",
+        "unit": "Med/Surg",
+        "updated_at": "2026-07-11T06:43:41+00:00"
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-07-11T06:43:41+00:00",
+        "diagnosis_group": "General Medicine",
+        "due_at": "2026-07-11T08:13:41+00:00",
+        "escalation_level": "High",
+        "is_active": true,
+        "minutes_until_due": 89,
+        "minutes_waiting": 0,
+        "notes": [],
+        "overdue": false,
+        "owner_role": "Transport",
+        "patient_id": "PT0472",
+        "reason": "Transport or facility transfer is pending.",
+        "recommended_action": "Confirm transport ETA or facility pickup.",
+        "severity": "High",
+        "sla_minutes": 90,
+        "source": "Discharge Readiness Checklist",
+        "source_checklist_item": "Transport arranged",
+        "status": "Pending",
+        "task_id": "TASK-PT0472-transport-arranged",
+        "task_type": "Transport arranged",
+        "unit": "Med/Surg",
+        "updated_at": "2026-07-11T06:43:41+00:00"
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-07-11T06:43:41+00:00",
+        "diagnosis_group": "General Medicine",
+        "due_at": "2026-07-11T07:43:41+00:00",
+        "escalation_level": "High",
+        "is_active": true,
+        "minutes_until_due": 59,
+        "minutes_waiting": 0,
+        "notes": [],
+        "overdue": false,
+        "owner_role": "Case Manager",
+        "patient_id": "PT0472",
+        "reason": "Case manager is unavailable.",
+        "recommended_action": "Assign case manager coverage or escalate to bed-flow lead.",
+        "severity": "High",
+        "sla_minutes": 60,
+        "source": "Discharge Readiness Checklist",
+        "source_checklist_item": "Case manager available",
+        "status": "Pending",
+        "task_id": "TASK-PT0472-case-manager-available",
+        "task_type": "Case manager available",
+        "unit": "Med/Surg",
+        "updated_at": "2026-07-11T06:43:41+00:00"
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-07-11T06:43:41+00:00",
+        "diagnosis_group": "General Medicine",
+        "due_at": "2026-07-11T09:43:41+00:00",
+        "escalation_level": "Medium",
+        "is_active": true,
+        "minutes_until_due": 179,
+        "minutes_waiting": 0,
+        "notes": [],
+        "overdue": false,
+        "owner_role": "Social Worker",
+        "patient_id": "PT0472",
+        "reason": "Social work review is pending.",
+        "recommended_action": "Request social work review for discharge barriers.",
+        "severity": "Medium",
+        "sla_minutes": 180,
+        "source": "Discharge Readiness Checklist",
+        "source_checklist_item": "Social work review",
+        "status": "Pending",
+        "task_id": "TASK-PT0472-social-work-review",
+        "task_type": "Social work review",
+        "unit": "Med/Surg",
+        "updated_at": "2026-07-11T06:43:41+00:00"
+      }
+    ],
+    "model_explanations": {
+      "discharge_delay": {
+        "prediction": "Critical delay risk (0.99 probability)",
+        "top_drivers": [
+          {
+            "explanation": "Rehab/SNF placement creates dependency on facility acceptance, transport, and authorization.",
+            "feature": "rehab_snf_placement_pending",
+            "model_importance": 0.1319,
+            "patient_value": "Yes",
+            "personalized_score": 0.1319,
+            "rank": 1,
+            "reason": "Rehab/SNF placement pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "This feature had meaningful importance in the trained XGBoost model for discharge delay risk.",
+            "feature": "social_work_pending",
+            "model_importance": 0.0494,
+            "patient_value": "Yes",
+            "personalized_score": 0.0494,
+            "rank": 2,
+            "reason": "Social work review pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Transport readiness determines whether a cleared patient can physically leave the hospital.",
+            "feature": "transport_pending",
+            "model_importance": 0.039,
+            "patient_value": "Yes",
+            "personalized_score": 0.039,
+            "rank": 3,
+            "reason": "Transport pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Medication work can delay discharge and can also affect discharge delay risk.",
+            "feature": "medication_complexity_Medium",
+            "model_importance": 0.0199,
+            "patient_value": "Selected category",
+            "personalized_score": 0.0199,
+            "rank": 4,
+            "reason": "Medication Complexity: Medium",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Case-manager availability affects the ability to clear insurance, placement, and home-care barriers.",
+            "feature": "case_manager_available",
+            "model_importance": 0.0182,
+            "patient_value": "No",
+            "personalized_score": 0.0182,
+            "rank": 5,
+            "reason": "Case manager available",
+            "signal_type": "Patient-specific active signal"
+          }
+        ]
+      },
+      "expected_delay_hours": {
+        "prediction": "24.2 predicted delay hours",
+        "top_drivers": [
+          {
+            "explanation": "Rehab/SNF placement creates dependency on facility acceptance, transport, and authorization.",
+            "feature": "rehab_snf_placement_pending",
+            "model_importance": 0.1933,
+            "patient_value": "Yes",
+            "personalized_score": 0.1933,
+            "rank": 1,
+            "reason": "Rehab/SNF placement pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "This feature had meaningful importance in the trained XGBoost model for expected delay hours.",
+            "feature": "social_work_pending",
+            "model_importance": 0.0599,
+            "patient_value": "Yes",
+            "personalized_score": 0.0599,
+            "rank": 2,
+            "reason": "Social work review pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Transport readiness determines whether a cleared patient can physically leave the hospital.",
+            "feature": "transport_pending",
+            "model_importance": 0.0381,
+            "patient_value": "Yes",
+            "personalized_score": 0.0381,
+            "rank": 3,
+            "reason": "Transport pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Hospital capacity pressure increases the operational value of resolving this case quickly.",
+            "feature": "ed_boarding_count",
+            "model_importance": 0.0134,
+            "patient_value": "19",
+            "personalized_score": 0.0134,
+            "rank": 4,
+            "reason": "ED boarding count",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Hospital capacity pressure increases the operational value of resolving this case quickly.",
+            "feature": "current_bed_occupancy_percent",
+            "model_importance": 0.0127,
+            "patient_value": "91%",
+            "personalized_score": 0.0127,
+            "rank": 5,
+            "reason": "Current bed occupancy",
+            "signal_type": "Patient-specific active signal"
+          }
+        ]
+      },
+      "explanation_method": "XGBoost feature-importance + selected-patient active feature values. This is a lightweight explanation, not formal SHAP.",
+      "governance_note": "Use these explanations for decision support and audit review only. They do not replace clinical judgment or validated hospital model governance.",
+      "plain_english_summary": "This case is rated Critical for discharge delay and High for readmission. The strongest visible delay driver is Rehab/SNF placement pending; the strongest visible readmission driver is Rehab/SNF placement pending.",
+      "readmission_risk": {
+        "prediction": "High readmission risk (0.74 probability)",
+        "top_drivers": [
+          {
+            "explanation": "Rehab/SNF placement creates dependency on facility acceptance, transport, and authorization.",
+            "feature": "rehab_snf_placement_pending",
+            "model_importance": 0.2856,
+            "patient_value": "Yes",
+            "personalized_score": 0.2856,
+            "rank": 1,
+            "reason": "Rehab/SNF placement pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Hospital capacity pressure increases the operational value of resolving this case quickly.",
+            "feature": "ed_boarding_count",
+            "model_importance": 0.0801,
+            "patient_value": "19",
+            "personalized_score": 0.0801,
+            "rank": 2,
+            "reason": "ED boarding count",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Prior utilization history is a proxy for clinical complexity and post-discharge vulnerability.",
+            "feature": "prior_admissions_6mo",
+            "model_importance": 0.0713,
+            "patient_value": "4",
+            "personalized_score": 0.0713,
+            "rank": 3,
+            "reason": "Prior admissions in last 6 months",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Transport readiness determines whether a cleared patient can physically leave the hospital.",
+            "feature": "transport_pending",
+            "model_importance": 0.0699,
+            "patient_value": "Yes",
+            "personalized_score": 0.0699,
+            "rank": 4,
+            "reason": "Transport pending",
+            "signal_type": "Patient-specific active signal"
+          },
+          {
+            "explanation": "Hospital capacity pressure increases the operational value of resolving this case quickly.",
+            "feature": "current_bed_occupancy_percent",
+            "model_importance": 0.0433,
+            "patient_value": "91%",
+            "personalized_score": 0.0433,
+            "rank": 5,
+            "reason": "Current bed occupancy",
+            "signal_type": "Patient-specific active signal"
+          }
+        ]
+      },
+      "status": "success"
     }
+  }
 ]

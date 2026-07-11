@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
 
 from backend.api import app
+from backend.auth import DEFAULT_DEMO_PASSWORD
 from backend.committee import run_committee
 from backend.memory import get_memory_state, init_memory
 from backend.models import DATA_PATH, bedflow_models
@@ -41,12 +42,24 @@ def test_api() -> None:
         "/api/hospital_capacity",
         "/api/discharge_queue?limit=3",
         "/api/fhir/capability",
+        "/api/auth/demo_users",
     ):
         response = client.get(path)
         assert response.status_code == 200, f"{path} returned {response.status_code}"
     queue = client.get("/api/discharge_queue?limit=3").get_json()
     assert queue and all(item.get("model_version") for item in queue)
-    print("API and model-scored queue checks passed.")
+
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": DEFAULT_DEMO_PASSWORD},
+    )
+    assert login.status_code == 200
+    token = login.get_json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    assert client.get("/api/auth/me", headers=headers).status_code == 200
+    assert client.get("/api/audit_log", headers=headers).status_code == 200
+    assert client.get("/api/tasks/events", headers=headers).status_code == 200
+    print("API, Stage 8 authentication, and model-scored queue checks passed.")
 
 
 def test_committee() -> None:

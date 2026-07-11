@@ -6,6 +6,44 @@ from urllib.parse import urlencode
 
 API_URL = os.getenv("BEDFLOW_API_URL", "http://127.0.0.1:5005/api").rstrip("/")
 
+
+def auth_headers():
+    token = st.session_state.get("auth_token")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def current_user():
+    return st.session_state.get("auth_user") or {}
+
+
+def user_permissions():
+    return set(current_user().get("permissions", []))
+
+
+def has_permission(permission):
+    return permission in user_permissions()
+
+
+def normalize_owner_role(owner_role):
+    aliases = {
+        "Pharmacy": "Pharmacist",
+        "Utilization Management": "Utilization Manager",
+        "Family / Case Manager": "Case Manager",
+        "Transport": "Transport Coordinator",
+    }
+    return aliases.get(owner_role, owner_role)
+
+
+def can_update_visible_task(task):
+    user = current_user()
+    permissions = user_permissions()
+    if "task.update_any" in permissions:
+        return True
+    return (
+        "task.update_own" in permissions
+        and normalize_owner_role(task.get("owner_role")) == user.get("role")
+    )
+
 st.set_page_config(page_title="BedFlow AI", layout="wide", initial_sidebar_state="expanded")
 
 # Minimal CSS enhancements (relying on config.toml for primary dark theme)
@@ -46,6 +84,65 @@ st.markdown("### *Discharge delay, readmission risk, bed recovery, and human-sup
 
 with st.sidebar:
     st.header("🎛️ Control Panel")
+
+    st.markdown("#### 🔐 Stage 8 Identity")
+    if not st.session_state.get("auth_token"):
+        try:
+            demo_response = requests.get(f"{API_URL}/auth/demo_users", timeout=5)
+            demo_payload = demo_response.json() if demo_response.status_code == 200 else {}
+            demo_users = demo_payload.get("users", [])
+        except requests.RequestException:
+            demo_users = []
+
+        if demo_users:
+            user_labels = {
+                f"{user.get('display_name')} — {user.get('role')}": user
+                for user in demo_users
+            }
+            selected_login = st.selectbox("Demo user", list(user_labels.keys()))
+            demo_password = st.text_input(
+                "Password",
+                value="BedFlowDemo!",
+                type="password",
+                help="Local demo default. Override with BEDFLOW_DEMO_PASSWORD.",
+            )
+            if st.button("Sign in", use_container_width=True, type="primary"):
+                chosen = user_labels[selected_login]
+                try:
+                    response = requests.post(
+                        f"{API_URL}/auth/login",
+                        json={"username": chosen.get("username"), "password": demo_password},
+                        timeout=10,
+                    )
+                    if response.status_code == 200:
+                        payload = response.json()
+                        st.session_state["auth_token"] = payload.get("token")
+                        st.session_state["auth_user"] = payload.get("user")
+                        st.success("Signed in.")
+                        st.rerun()
+                    else:
+                        st.error(response.json().get("message", "Sign-in failed."))
+                except requests.RequestException as exc:
+                    st.error(f"Sign-in unavailable: {exc}")
+        else:
+            st.warning("Backend identity service is unavailable.")
+    else:
+        user = current_user()
+        st.success(f"{user.get('display_name')} — {user.get('role')}")
+        st.caption(user.get("department", ""))
+        with st.expander("Permissions", expanded=False):
+            for permission in sorted(user_permissions()):
+                st.write(f"• `{permission}`")
+        if st.button("Sign out", use_container_width=True):
+            try:
+                requests.post(f"{API_URL}/auth/logout", headers=auth_headers(), timeout=5)
+            except requests.RequestException:
+                pass
+            st.session_state.pop("auth_token", None)
+            st.session_state.pop("auth_user", None)
+            st.rerun()
+
+    st.divider()
     
     # Token Usage Tracker
     st.session_state.setdefault("total_tokens", 0)
@@ -104,13 +201,18 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     st.markdown("#### System Operations")
-    if st.button("🔄 Refresh / Train Models", use_container_width=True):
+    if st.button(
+        "🔄 Refresh / Train Models",
+        use_container_width=True,
+        disabled=not has_permission("model.train"),
+        help="Administrator permission is required.",
+    ):
         with st.spinner("Training models..."):
-            res = requests.post(f"{API_URL}/train_models")
+            res = requests.post(f"{API_URL}/train_models", headers=auth_headers(), timeout=120)
             if res.status_code == 200:
                 st.success("Models trained and versioned artifacts published successfully.")
             else:
-                st.error("Failed to train and publish models.")
+                st.error(f"Training failed: {res.text}")
                 
     st.divider()
     st.markdown("#### Settings")
@@ -156,7 +258,7 @@ with st.sidebar:
 
 def api_get(path, default):
     try:
-        res = requests.get(f"{API_URL}{path}", timeout=10)
+        res = requests.get(f"{API_URL}{path}", headers=auth_headers(), timeout=10)
         if res.status_code == 200:
             return res.json()
         return default
@@ -166,7 +268,7 @@ def api_get(path, default):
 
 
 def api_post(path, payload=None):
-    return requests.post(f"{API_URL}{path}", json=payload, timeout=60)
+    return requests.post(f"{API_URL}{path}", json=payload, headers=auth_headers(), timeout=60)
 
 
 def load_patients():
@@ -270,6 +372,24 @@ def load_overdue_tasks():
     return api_get("/tasks/overdue", [])
 
 
+def load_task_events(patient_id=None, actor_role=None):
+    params = {}
+    if patient_id:
+        params["patient_id"] = patient_id
+    if actor_role and actor_role != "All":
+        params["actor_role"] = actor_role
+    query = f"?{urlencode(params)}" if params else ""
+    return api_get(f"/tasks/events{query}", [])
+
+
+def download_audit_csv():
+    return requests.get(f"{API_URL}/audit/export.csv", headers=auth_headers(), timeout=30)
+
+
+def load_access_log():
+    return api_get("/access_log", [])
+
+
 def sync_patient_tasks(patient_data, checklist):
     if not checklist:
         return {"patient_tasks": [], "summary": {}}
@@ -287,12 +407,11 @@ def sync_patient_tasks(patient_data, checklist):
         return {"patient_tasks": [], "summary": {}}
 
 
-def update_task_status(task_id, status, note, updated_by):
+def update_task_status(task_id, status, note):
     return api_post("/tasks/update_status", {
         "task_id": task_id,
         "status": status,
         "note": note,
-        "updated_by": updated_by,
     })
 
 
@@ -692,11 +811,16 @@ def display_patient_task_workflow(task_bundle, patient_id):
     st.dataframe(_task_dataframe(tasks), use_container_width=True, hide_index=True)
 
     active_tasks = [task for task in tasks if task.get("status") != "Completed"]
-    if active_tasks:
-        with st.expander("Update a patient task", expanded=False):
+    permitted_tasks = [task for task in active_tasks if can_update_visible_task(task)]
+    if active_tasks and not current_user():
+        st.info("Sign in to update workflow tasks. The backend binds each update to the authenticated identity.")
+    elif active_tasks and not permitted_tasks:
+        st.caption(f"{current_user().get('role')} can view these tasks but cannot update tasks owned by other roles.")
+    elif permitted_tasks:
+        with st.expander("Update an authorized patient task", expanded=False):
             task_options = {
                 f"{task['task_id']} | {task.get('owner_role')} | {task.get('task_type')}": task["task_id"]
-                for task in active_tasks
+                for task in permitted_tasks
             }
             selected_task_label = st.selectbox(
                 "Task to update",
@@ -708,16 +832,15 @@ def display_patient_task_workflow(task_bundle, patient_id):
                 ["Pending", "In Progress", "Blocked", "Escalated", "Completed"],
                 key=f"task_status_{patient_id}",
             )
-            updated_by = st.selectbox(
-                "Updated by role",
-                ["Bed Manager", "Physician", "Nurse", "Pharmacy", "Transport", "Case Manager", "Utilization Management", "Social Worker"],
-                key=f"task_updated_by_{patient_id}",
+            st.caption(
+                f"Update will be attributed to {current_user().get('display_name')} "
+                f"({current_user().get('role')})."
             )
             note = st.text_input("Optional task note", key=f"task_note_{patient_id}")
             if st.button("Save Task Update", key=f"task_update_btn_{patient_id}"):
-                update_res = update_task_status(task_options[selected_task_label], new_status, note, updated_by)
+                update_res = update_task_status(task_options[selected_task_label], new_status, note)
                 if update_res.status_code == 200:
-                    st.success("Task updated.")
+                    st.success("Task updated and immutable event recorded.")
                     st.rerun()
                 else:
                     st.error(f"Task update failed: {update_res.text}")
@@ -729,7 +852,13 @@ def display_tasks_and_escalations_tab():
 
     c1, c2 = st.columns([1, 2])
     with c1:
-        if st.button("Generate / Refresh Tasks From Demo Patients", type="primary", use_container_width=True):
+        if st.button(
+            "Generate / Refresh Tasks From Demo Patients",
+            type="primary",
+            use_container_width=True,
+            disabled=not has_permission("task.sync"),
+            help="Bed Manager or Administrator permission is required.",
+        ):
             with st.spinner("Creating tasks from discharge checklist blockers..."):
                 res = api_post("/tasks/sync_all", {"limit": 100})
                 if res.status_code == 200:
@@ -967,7 +1096,20 @@ with tabs[0]:
                 st.divider()
                 display_discharge_readiness_checklist(checklist_preview)
 
-                task_bundle = sync_patient_tasks(patient_data, checklist_preview)
+                if current_user():
+                    task_bundle = sync_patient_tasks(patient_data, checklist_preview)
+                else:
+                    existing_tasks = load_tasks(patient_id=selected_id)
+                    active_tasks = [task for task in existing_tasks if task.get("status") != "Completed"]
+                    task_bundle = {
+                        "patient_tasks": existing_tasks,
+                        "summary": {
+                            "active_tasks": len(active_tasks),
+                            "overdue_tasks": sum(1 for task in active_tasks if task.get("overdue")),
+                            "escalated_tasks": sum(1 for task in active_tasks if task.get("status") == "Escalated"),
+                            "completed_tasks": sum(1 for task in existing_tasks if task.get("status") == "Completed"),
+                        },
+                    }
                 st.divider()
                 display_patient_task_workflow(task_bundle, selected_id)
             else:
@@ -1013,54 +1155,58 @@ with tabs[0]:
                     st.json(res["research_outputs"])
 
                 st.divider()
-                st.subheader("Human-in-the-Loop Review")
-                st.caption("The AI recommends; an identified human reviewer records the final operational decision. This demo does not authenticate users yet.")
-                r1, r2 = st.columns(2)
-                reviewer_name = r1.text_input("Reviewer name", value=st.session_state.get("reviewer_name", "Demo Supervisor"))
-                reviewer_role = r2.selectbox(
-                    "Reviewer role",
-                    ["Bed Manager", "Physician", "Nurse", "Pharmacist", "Case Manager", "Utilization Manager", "Administrator"],
-                )
-                human_dec = st.selectbox("Action", ["Approve", "Override", "Escalate to Case Manager", "Hold"])
-                reason_required = human_dec in {"Override", "Escalate to Case Manager", "Hold"}
-                human_note = st.text_area(
-                    "Decision rationale" + (" (required)" if reason_required else " (optional)"),
-                    help="Override, escalation, and hold decisions require a written reason for the audit trail.",
-                )
-
-                if st.button("Save Decision to Audit Log"):
-                    st.session_state["reviewer_name"] = reviewer_name
-                    if not reviewer_name.strip():
-                        st.error("Reviewer name is required.")
-                    elif reason_required and not human_note.strip():
-                        st.error("A written reason is required for override, escalation, or hold decisions.")
+                st.subheader("Authenticated Human Review")
+                st.caption("Stage 8 binds the decision to the signed-in identity and enforces allowed actions in the backend.")
+                reviewer = current_user()
+                if not reviewer:
+                    st.warning("Sign in from the sidebar to record a human decision.")
+                else:
+                    st.info(
+                        f"Signed in as **{reviewer.get('display_name')}** · "
+                        f"Role: **{reviewer.get('role')}** · Department: {reviewer.get('department')}"
+                    )
+                    allowed_decisions = reviewer.get("allowed_decisions", [])
+                    if not allowed_decisions:
+                        st.warning("This role may contribute to owned tasks but cannot record a final committee decision.")
                     else:
-                        audit_payload = {
-                            "patient_id": selected_id,
-                            "patient_data": patient_data,
-                            "model_outputs": outs,
-                            "research_outputs": res["research_outputs"],
-                            "committee_recommendation": res["final_recommendation"],
-                            "human_decision": human_dec,
-                            "human_note": human_note,
-                            "reviewer_name": reviewer_name,
-                            "reviewer_role": reviewer_role,
-                            "memory_insight": res["memory_insight"],
-                            "discharge_checklist": res.get("discharge_checklist") or st.session_state.get("discharge_checklist"),
-                            "task_snapshot": st.session_state.get("patient_tasks", []),
-                            "model_explanations": st.session_state.get("model_explanations")
-                        }
-                        save_res = api_post("/save_human_decision", audit_payload)
-                        if save_res.status_code == 200:
-                            st.success("Decision saved successfully.")
-                            st.session_state.pop("committee_result", None)
-                            st.session_state.pop("model_outputs", None)
-                            st.session_state.pop("discharge_checklist", None)
-                            st.session_state.pop("patient_tasks", None)
-                            st.session_state.pop("model_explanations", None)
-                            st.rerun()
-                        else:
-                            st.error(f"Save failed: {save_res.text}")
+                        human_dec = st.selectbox("Permitted action", allowed_decisions)
+                        reason_required = human_dec in {"Override", "Escalate to Case Manager", "Hold"}
+                        human_note = st.text_area(
+                            "Decision rationale" + (" (required)" if reason_required else " (optional)"),
+                            help="Override, escalation, and hold decisions require a written reason for the audit trail.",
+                        )
+
+                        if st.button("Save Authenticated Decision to Audit Log"):
+                            if reason_required and not human_note.strip():
+                                st.error("A written reason is required for override, escalation, or hold decisions.")
+                            else:
+                                audit_payload = {
+                                    "patient_id": selected_id,
+                                    "patient_data": patient_data,
+                                    "model_outputs": outs,
+                                    "research_outputs": res["research_outputs"],
+                                    "committee_recommendation": res["final_recommendation"],
+                                    "human_decision": human_dec,
+                                    "human_note": human_note,
+                                    # These fields are informational only; the backend uses the signed token identity.
+                                    "reviewer_name": reviewer.get("display_name"),
+                                    "reviewer_role": reviewer.get("role"),
+                                    "memory_insight": res["memory_insight"],
+                                    "discharge_checklist": res.get("discharge_checklist") or st.session_state.get("discharge_checklist"),
+                                    "task_snapshot": st.session_state.get("patient_tasks", []),
+                                    "model_explanations": st.session_state.get("model_explanations")
+                                }
+                                save_res = api_post("/save_human_decision", audit_payload)
+                                if save_res.status_code == 200:
+                                    st.success("Authenticated decision saved successfully.")
+                                    st.session_state.pop("committee_result", None)
+                                    st.session_state.pop("model_outputs", None)
+                                    st.session_state.pop("discharge_checklist", None)
+                                    st.session_state.pop("patient_tasks", None)
+                                    st.session_state.pop("model_explanations", None)
+                                    st.rerun()
+                                else:
+                                    st.error(f"Save failed: {save_res.text}")
 
 # Tab 2: Tasks & Escalations
 with tabs[1]:
@@ -1172,7 +1318,7 @@ with tabs[2]:
 
 # Tab 4: Memory & Audit Log
 with tabs[3]:
-    st.header("System Memory and Audit Log")
+    st.header("Authenticated Audit, Task Events & System Memory")
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Current State")
@@ -1183,29 +1329,78 @@ with tabs[3]:
             st.write("Failed to load memory state")
 
     with col2:
-        st.subheader("Audit Log")
-        logs = api_get("/audit_log", [])
-        if logs:
-            audit_rows = []
-            for log in reversed(logs):
-                audit_rows.append({
-                    "Timestamp UTC": log.get("timestamp_utc") or log.get("timestamp"),
-                    "Patient": log.get("patient_id"),
-                    "Reviewer": log.get("reviewer_name", "Legacy record"),
-                    "Role": log.get("reviewer_role", "Unknown"),
-                    "AI Recommendation": log.get("committee_recommendation"),
-                    "Human Decision": log.get("human_decision"),
-                    "Rationale": log.get("human_note", ""),
-                    "Model Version": log.get("model_version", "Unknown"),
-                })
-            audit_df = pd.DataFrame(audit_rows)
-            role_options = ["All"] + sorted([role for role in audit_df["Role"].dropna().unique().tolist() if role])
-            role_filter = st.selectbox("Filter audit by role", role_options, key="audit_role_filter")
-            if role_filter != "All":
-                audit_df = audit_df[audit_df["Role"] == role_filter]
-            st.dataframe(audit_df, use_container_width=True, hide_index=True)
+        st.subheader("Decision Audit Log")
+        if not has_permission("audit.read"):
+            st.info("Sign in with an audit-enabled role to view decision records.")
         else:
-            st.write("No audit records yet.")
+            logs = api_get("/audit_log", [])
+            if logs:
+                audit_rows = []
+                for log in reversed(logs):
+                    audit_rows.append({
+                        "Audit ID": log.get("audit_id", "Legacy"),
+                        "Timestamp UTC": log.get("timestamp_utc") or log.get("timestamp"),
+                        "Patient": log.get("patient_id"),
+                        "Reviewer": log.get("reviewer_name", "Legacy record"),
+                        "Role": log.get("reviewer_role", "Unknown"),
+                        "AI Recommendation": log.get("committee_recommendation"),
+                        "Human Decision": log.get("human_decision"),
+                        "Rationale": log.get("human_note", ""),
+                        "Model Version": log.get("model_version", "Unknown"),
+                    })
+                audit_df = pd.DataFrame(audit_rows)
+                f1, f2, f3 = st.columns(3)
+                role_options = ["All"] + sorted([role for role in audit_df["Role"].dropna().unique().tolist() if role])
+                role_filter = f1.selectbox("Role", role_options, key="audit_role_filter")
+                decision_options = ["All"] + sorted([value for value in audit_df["Human Decision"].dropna().unique().tolist() if value])
+                decision_filter = f2.selectbox("Decision", decision_options, key="audit_decision_filter")
+                patient_filter = f3.text_input("Patient contains", key="audit_patient_filter")
+                if role_filter != "All":
+                    audit_df = audit_df[audit_df["Role"] == role_filter]
+                if decision_filter != "All":
+                    audit_df = audit_df[audit_df["Human Decision"] == decision_filter]
+                if patient_filter.strip():
+                    audit_df = audit_df[audit_df["Patient"].astype(str).str.contains(patient_filter.strip(), case=False)]
+                st.dataframe(audit_df, use_container_width=True, hide_index=True)
+
+                if has_permission("audit.export"):
+                    export_response = download_audit_csv()
+                    if export_response.status_code == 200:
+                        st.download_button(
+                            "Download administrator audit CSV",
+                            data=export_response.content,
+                            file_name="bedflow_audit_export.csv",
+                            mime="text/csv",
+                        )
+                    else:
+                        st.error(f"Audit export failed: {export_response.text}")
+            else:
+                st.write("No audit records yet.")
+
+    st.divider()
+    st.subheader("Immutable Task Event History")
+    if has_permission("audit.read"):
+        events = load_task_events()
+        if events:
+            event_df = pd.DataFrame(events)
+            event_columns = [
+                "timestamp_utc", "event_id", "patient_id", "task_id", "task_type",
+                "owner_role", "old_status", "new_status", "actor_name", "actor_role", "note"
+            ]
+            event_columns = [column for column in event_columns if column in event_df.columns]
+            st.dataframe(event_df[event_columns], use_container_width=True, hide_index=True)
+        else:
+            st.caption("Task events will appear after tasks are created or updated.")
+    else:
+        st.info("Audit permission is required to view task history.")
+
+    if has_permission("access.read"):
+        with st.expander("Administrator access log", expanded=False):
+            access_events = load_access_log()
+            if access_events:
+                st.dataframe(pd.DataFrame(list(reversed(access_events))), use_container_width=True, hide_index=True)
+            else:
+                st.caption("No access events recorded yet.")
 
 # Tab 5: FHIR Interoperability
 with tabs[4]:

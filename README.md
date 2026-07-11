@@ -11,11 +11,41 @@
   <img alt="Flask" src="https://img.shields.io/badge/API-Flask-000000?logo=flask&logoColor=white">
   <img alt="FHIR" src="https://img.shields.io/badge/Interop-FHIR%20R4--shaped-5A67D8">
   <img alt="Human supervised" src="https://img.shields.io/badge/Safety-Human%20Supervised-2E8B57">
+  <img alt="Stage 8" src="https://img.shields.io/badge/Upgrade-Stage%208%20Complete-6F42C1">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-10%20Passing-2E8B57">
+  <img alt="RBAC" src="https://img.shields.io/badge/Workflow-Role%20Based-0A66C2">
 </p>
 
 BedFlow AI is a portfolio-grade hospital operations prototype that helps users identify discharge blockers, prioritize patient reviews, estimate discharge delay and 30-day readmission risk, coordinate operational tasks, and record human-supervised decisions.
 
 > **Important:** BedFlow AI is a demonstration and decision-support system. It does not diagnose, authorize discharge, replace clinical judgment, or connect to a live EHR.
+
+## Latest release — Stage 8 role-based workflow
+
+This package completes the next major modernization step: **authenticated, role-aware operational workflow with identity-bound auditability**.
+
+### What changed in this release
+
+- signed local user sessions with time-limited bearer tokens;
+- backend-enforced permissions rather than UI-only restrictions;
+- role-owned task updates for pharmacy, placement, insurance, transport, nursing, physician, and social-work workflows;
+- immutable task-event history showing who changed what and when;
+- authenticated human decisions tied to a real demo identity and role;
+- mandatory rationale for hold, escalation, and override decisions;
+- Administrator-only model retraining, audit export, and access-log review;
+- updated tests, deployment configuration, roadmap, and safety wording.
+
+**Release status:** Stage 8 complete · 10 automated tests passing · Stage 9 is next.
+
+### Quick navigation
+
+- [Application workflow](#end-to-end-workflow)
+- [Stage 8 permissions](#stage-8-authenticated-role-based-workflow)
+- [Quick start](#quick-start)
+- [Demo login accounts](#demo-login-accounts)
+- [API highlights](#api-highlights)
+- [Testing](#testing)
+- [What remains](#what-remains)
 
 ---
 
@@ -28,7 +58,7 @@ BedFlow AI combines six operational views into one workflow:
 3. **Discharge readiness checklist** — clinical, pharmacy, transport, insurance, placement, home-care, and social-work blockers.
 4. **Task ownership and escalation** — owner, status, SLA timer, overdue state, and escalation level.
 5. **Multi-agent decision support** — Patient Safety Advocate, Operations & Flow Manager, and Clinical Director synthesis.
-6. **Human review, audit, and interoperability** — reviewer attribution, decision rationale, audit trail, memory, and FHIR R4-shaped export.
+6. **Authenticated workflow, audit, and interoperability** — signed local identities, backend permissions, immutable task events, human decision audit, memory, and FHIR R4-shaped export.
 
 ### The three model outputs
 
@@ -83,7 +113,8 @@ The queue prioritizes **review**. A low-risk patient is not automatically discha
 
 ```mermaid
 flowchart TB
-    U[Streamlit Control Tower] --> API[Flask / Waitress API]
+    U[Streamlit Control Tower] --> AUTH[Stage 8 signed identity]
+    AUTH --> API[Flask / Waitress API]
 
     API --> CC[Command Center]
     API --> ML[BedFlowModels]
@@ -225,27 +256,52 @@ The committee can run with:
 
 ---
 
-## Human review and audit foundation
+## Stage 8 authenticated role-based workflow
 
-Every newly saved human decision now records:
+Stage 8 adds a working **local demonstration authentication and authorization layer**.
 
-- patient ID;
-- reviewer name;
-- reviewer role;
-- AI recommendation;
-- human action;
+### What is enforced
+
+- users sign in and receive a signed, time-limited bearer token;
+- model training and artifact management are Administrator-only;
+- Bed Managers and Administrators can update any task;
+- specialist roles can update only tasks owned by their role;
+- permitted final decisions vary by role;
+- the backend takes reviewer identity from the token rather than trusting browser fields;
+- audit CSV export and access-log viewing are Administrator-only.
+
+### Demonstration roles
+
+| Role | Main workflow authority |
+|---|---|
+| Administrator | Model operations, all tasks, all decisions, audit export, access log |
+| Bed Manager | All operational tasks and supervised committee decisions |
+| Physician | Physician-owned tasks and all committee decision actions |
+| Nurse | Nurse-owned tasks; hold or escalate decisions |
+| Pharmacist | Pharmacy-owned tasks |
+| Case Manager | Placement/home-care tasks; hold or escalate decisions |
+| Utilization Manager | Insurance-authorization tasks; hold or escalate decisions |
+| Social Worker | Social-work-owned tasks |
+| Transport Coordinator | Transport-owned tasks |
+
+### Immutable task events
+
+The current task record still shows the latest state, while every status change also appends an immutable event with the old status, new status, actor, role, note, and UTC timestamp.
+
+### Identity-bound audit
+
+Every newly saved human decision records:
+
+- audit ID;
+- authenticated user ID, reviewer name, and role;
+- AI recommendation and human action;
 - written rationale;
-- model version;
-- UTC timestamp;
-- checklist, tasks, model output, and explanations.
+- model version and timestamp;
+- checklist, task, model-output, and explanation snapshots.
 
-A written reason is mandatory for:
+A written reason remains mandatory for override, escalation, and hold.
 
-- override;
-- escalation;
-- hold.
-
-This is a **Stage 8 foundation**, not authenticated role-based access control. A production implementation still needs identity-provider integration and backend permission enforcement.
+> This is a portfolio-grade local RBAC implementation. A real hospital deployment must replace it with enterprise SSO/OIDC, MFA, HTTPS, managed sessions, and database-backed identity governance.
 
 ---
 
@@ -289,7 +345,9 @@ The adapter is not a certified FHIR server. It does not implement SMART on FHIR,
 - blocker-generated task queue;
 - operational owner;
 - status and SLA timer;
-- overdue and escalation views.
+- overdue and escalation views;
+- backend-enforced role ownership;
+- authenticated task updates and immutable event history.
 
 ### Model Quality & Transparency
 
@@ -303,9 +361,10 @@ The adapter is not a certified FHIR server. It does not implement SMART on FHIR,
 ### Memory & Audit Log
 
 - current memory state;
-- reviewer-attributed decision records;
-- role filter;
-- committee and human decision comparison.
+- authenticated decision records;
+- patient, role, and decision filters;
+- immutable task event history;
+- Administrator CSV export and access-log view.
 
 ### FHIR Interoperability
 
@@ -326,16 +385,23 @@ The adapter is not a certified FHIR server. It does not implement SMART on FHIR,
 
 | Endpoint | Method | Purpose |
 |---|---|---|
-| `/api/health` | GET | Backend, model, version, and dataset readiness |
+| `/api/health` | GET | Backend, model, version, dataset, and authentication readiness |
+| `/api/auth/login` | POST | Authenticate a local demo user and issue a signed token |
+| `/api/auth/me` | GET | Resolve the authenticated identity and permissions |
+| `/api/auth/role_matrix` | GET | Show role permissions and allowed decisions |
 | `/api/demo_patients` | GET | Demo patient records |
 | `/api/hospital_capacity` | GET | Simulated capacity snapshot enriched by cached model scores |
 | `/api/discharge_queue` | GET | Model-scored prioritized review queue |
 | `/api/predict_patient` | POST | Three XGBoost predictions for one patient |
 | `/api/explain_patient` | POST | Patient-level model reasons |
 | `/api/discharge_checklist` | POST | Readiness checklist and blockers |
-| `/api/tasks/sync` | POST | Generate/update patient tasks |
+| `/api/tasks/sync` | POST | Generate/update patient tasks for an authenticated workflow |
+| `/api/tasks/update_status` | POST | Role-authorized task update |
+| `/api/tasks/events` | GET | Immutable task event history |
 | `/api/run_committee` | POST | Full multi-agent decision workflow |
-| `/api/save_human_decision` | POST | Reviewer-attributed audit record |
+| `/api/save_human_decision` | POST | Identity-bound human decision record |
+| `/api/audit/export.csv` | GET | Administrator audit export |
+| `/api/access_log` | GET | Administrator access-event log |
 | `/api/model_governance` | GET | Artifact and version registry |
 | `/api/train_models` | POST | Explicit retraining and artifact publication |
 | `/api/fhir/bundle` | POST | FHIR R4-shaped export bundle |
@@ -356,6 +422,7 @@ bedflow_ai/
 ├── .env.example
 ├── backend/
 │   ├── api.py
+│   ├── auth.py
 │   ├── models.py
 │   ├── command_center.py
 │   ├── discharge_checklist.py
@@ -388,10 +455,14 @@ bedflow_ai/
 │   ├── model_metrics.json
 │   ├── model_metrics_history.json
 │   ├── tasks.json
+│   ├── task_events.json          # runtime-created
+│   ├── demo_users.json           # runtime-created password hashes
+│   ├── access_log.json           # runtime-created
 │   ├── audit_log.json
 │   └── bedflow_memory_*.json
 ├── dataset_diabetes/
 └── docs/
+    └── STAGE_8_ROLE_BASED_WORKFLOW.md
 ```
 
 ---
@@ -452,6 +523,32 @@ Health:    http://127.0.0.1:5005/api/health
 
 The launcher prepares missing datasets, starts the API with Waitress when available, and starts Streamlit.
 
+### 5. Sign in to the Stage 8 workflow
+
+Select a demonstration user in the sidebar. The default local password is:
+
+```text
+BedFlowDemo!
+```
+
+### Demo login accounts
+
+| Username | Demo identity | Role | Main authority |
+|---|---|---|---|
+| `admin` | Demo Administrator | Administrator | Model operations, all tasks, all decisions, audit export |
+| `bedmanager` | Jordan Lee | Bed Manager | All operational tasks and supervised decisions |
+| `physician` | Dr. Maya Patel | Physician | Physician tasks and all committee decision actions |
+| `nurse` | Alex Morgan, RN | Nurse | Nursing tasks; hold or escalate |
+| `pharmacist` | Taylor Chen, PharmD | Pharmacist | Pharmacy-owned tasks |
+| `casemanager` | Sam Rivera | Case Manager | Placement and home-care tasks; hold or escalate |
+| `utilization` | Chris Bennett | Utilization Manager | Insurance-authorization tasks; hold or escalate |
+| `socialworker` | Jamie Brooks | Social Worker | Social-work-owned tasks |
+| `transport` | Morgan Davis | Transport Coordinator | Transport-owned tasks |
+
+All demonstration users initially use the same local password. Set `BEDFLOW_DEMO_PASSWORD` before the first startup to use a different password. Existing generated password hashes are retained in `database/demo_users.json`; delete that file only when intentionally resetting the demo identities.
+
+> These accounts are for local demonstration only. Do not use the default password or local identity store for an internet-facing production deployment.
+
 ---
 
 ## Environment variables
@@ -464,6 +561,9 @@ The launcher prepares missing datasets, starts the API with Waitress when availa
 | `BEDFLOW_DASHBOARD_PORT` | `8501` | Local Streamlit port |
 | `PORT` | platform supplied | Public Streamlit port on Railway/other platforms |
 | `BEDFLOW_USE_WAITRESS` | `true` | Use Waitress instead of Flask development server |
+| `BEDFLOW_AUTH_SECRET` | local demo fallback | Signs Stage 8 bearer tokens; set a strong secret outside local demos |
+| `BEDFLOW_DEMO_PASSWORD` | `BedFlowDemo!` | Initial password used when demo users are first generated |
+| `BEDFLOW_TOKEN_MAX_AGE_SECONDS` | `28800` | Signed-token lifetime (8 hours) |
 | `GROQ_API_KEY` | unset | Optional Groq committee mode |
 | `GEMINI_API_KEY` | unset | Optional Gemini committee mode |
 
@@ -500,10 +600,11 @@ Train and publish all artifacts:
 python training/train_models.py
 ```
 
-Or use:
+Or use the Administrator-protected endpoint:
 
 ```text
 POST /api/train_models
+Authorization: Bearer <administrator-token>
 ```
 
 Training is explicit. Normal queue loading and patient evaluation use the saved artifacts.
@@ -524,14 +625,18 @@ Run the broader smoke test:
 python backend/smoke_test_bedflow.py
 ```
 
-The current tests cover:
+The current automated suite contains **10 tests** covering:
 
 - FHIR bundle structure;
 - batch XGBoost queue scoring;
 - protection against outcome-column leakage during inference;
 - simulated capacity metadata;
-- reviewer and model-version audit fields;
-- import, dataset, model, committee, and memory smoke checks.
+- signed login and `/auth/me` identity resolution;
+- role-owned task authorization at both helper and API levels;
+- immutable task event creation;
+- identity-bound audit fields;
+- protected decision actions and mandatory exception rationale;
+- import, dataset, model, committee, memory, and API smoke checks.
 
 ---
 
@@ -544,39 +649,42 @@ The current tests cover:
 5. Model artifacts, registry, metrics history, and model card
 6. Public readmission-data training layer
 7. FHIR R4-shaped interoperability export
-8. **Modernization increment:** model-scored queue, leakage-safe fallback, reviewer-attributed audit foundation, environment-driven deployment, Docker/Railway packaging, and expanded tests
+8. **Authenticated local role-based workflow** — signed users, backend permissions, role-owned task updates, immutable task events, identity-bound decisions, administrator audit export, and access logging
 
 ---
 
 ## What remains
 
-### Stage 8 — Full role-based workflow
-
-- real login/authentication;
-- staff identity from an identity provider;
-- backend-enforced permissions;
-- role-specific task actions;
-- append-only task event history;
-- administrator audit filters and exports.
+```mermaid
+flowchart LR
+    S8[Stage 8 complete<br/>Authenticated role workflow] --> S9[Stage 9 next<br/>Capacity what-if simulator]
+    S9 --> S10[Stage 10<br/>Production and portfolio polish]
+    S10 --> PROD[Production path<br/>Database, SSO, monitoring, validation]
+```
 
 ### Stage 9 — Capacity what-if simulator
 
-- clear pharmacy or transport blockers;
-- increase case-management capacity;
-- resolve insurance or placement constraints;
-- compare current versus simulated beds recovered, delay-hours removed, and ED boarding relief.
+This is now the next feature stage:
+
+- simulate clearing pharmacy, transport, insurance, placement, and home-care blockers;
+- add case-management or transport capacity;
+- compare current versus simulated beds recovered;
+- estimate delay-hours removed and patients moved to discharge-ready review;
+- estimate potential ED boarding relief;
+- save and compare named scenarios.
 
 ### Stage 10 — Portfolio and production polish
 
 - screenshots and demo GIF/video;
 - public GitHub Pages landing page;
-- CI workflow;
-- PostgreSQL persistence;
+- GitHub Actions CI workflow;
+- PostgreSQL persistence and transactional audit storage;
 - structured logging and monitoring;
-- calibration and threshold analysis;
+- model calibration and threshold analysis;
 - patient-group validation split;
 - fairness/subgroup review;
 - formal SHAP explanations;
+- enterprise SSO/OIDC, MFA, managed sessions, and HTTPS;
 - SMART on FHIR/OAuth only if moving toward real integration.
 
 ---
@@ -586,8 +694,8 @@ The current tests cover:
 - The unit bed board is simulated and inferred; it is not a live ADT feed.
 - The operational delay models use synthetic/proxy data.
 - The readmission model uses a public diabetes-focused dataset as a proxy for a broader discharge population.
-- JSON persistence is not safe for multi-user production workloads.
-- Reviewer identity is entered in the UI and is not authenticated.
+- JSON persistence and local access logs are not safe for concurrent multi-user production workloads.
+- Authentication is a signed local demonstration layer, not enterprise SSO, MFA, or hospital identity governance.
 - The FHIR output is R4-shaped demonstration JSON, not certified conformance.
 - Agent recommendations can be generated by deterministic rules or optional LLMs and always require human review.
 - Model scores must never be treated as a discharge order.
@@ -605,3 +713,7 @@ It is not designed to answer:
 > “Should this patient be discharged automatically?”
 
 Final discharge readiness must remain with authorized clinical staff using the complete patient record and local policy.
+
+---
+
+**README status:** Updated for the Stage 8 RBAC release and validated against the packaged code and automated test suite on 2026-07-11.
