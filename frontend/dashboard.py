@@ -1460,7 +1460,9 @@ with tabs[0]:
                                 st.warning(f"{decision_system} token usage was 0. The request likely failed and fell back to the Expert System. Check the Audit Reasoning below for error details.")
                             
                             if result.get("llm_error"):
-                                st.toast(f"LLM Error: {result['llm_error']}", icon="🚨")
+                                st.error(f"🚨 **FATAL LLM ERROR (Execution Halted for Screenshot):**\n\n{result['llm_error']}")
+                                st.session_state["is_evaluating"] = False
+                                st.stop()
                     else:
                         st.error(f"Prediction failed: {pred_res.text}")
                         
