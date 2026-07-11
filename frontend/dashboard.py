@@ -157,7 +157,7 @@ with st.sidebar:
     with col2:
         st.write("") # spacing alignment
         st.write("") 
-        if st.button("🔄 Reset", help="Reset tokens to zero", use_container_width=True):
+        if st.button("🔄 Reset Tokens", help="Reset tokens to zero", use_container_width=True):
             st.session_state["total_tokens"] = 0
             st.rerun()
     
