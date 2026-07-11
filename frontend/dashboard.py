@@ -157,7 +157,7 @@ with st.sidebar:
     with col2:
         st.write("") # spacing alignment
         st.write("") 
-        if st.button("🔄 Reset Tokens", help="Reset tokens to zero", use_container_width=True):
+        if st.button("🔄 Reset", help="Reset tokens to zero", use_container_width=True):
             st.session_state["total_tokens"] = 0
             st.rerun()
     
@@ -235,7 +235,7 @@ with st.sidebar:
     if decision_system == "Groq":
         model_name = st.selectbox(
             "⚡ Groq Model",
-            ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.6-27b", "groq/compound-mini", "llama-3.3-70b-versatile"]
+            ["llama-3.3-70b-versatile", "openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.6-27b", "groq/compound-mini"]
         )
     elif decision_system == "Gemini LLM":
         model_name = st.selectbox(

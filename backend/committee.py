@@ -74,7 +74,7 @@ def call_llm(prompt, decision_system, model_name, is_json=False):
         from groq import Groq
         client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
         kwargs = {
-            "model": model_name or os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b"),
+            "model": model_name or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.0
         }
@@ -263,7 +263,7 @@ Your sole focus is hospital capacity and throughput. Review the following patien
                 from groq import Groq
                 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
                 kwargs = {
-                    "model": model_name or os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b"),
+                    "model": model_name or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.0
                 }
