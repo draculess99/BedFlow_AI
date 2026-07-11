@@ -112,17 +112,29 @@ BedFlow AI brings those signals into one operational workflow:
 
 ## Visual Tour
 
-| Hospital Command Center | Patient Case Review |
-|:---:|:---:|
-| ![Command Center](docs/images/control_tower_dashboard.png)<br><sub>*The live operational bed board showing unit capacity alongside the ML-scored discharge queue.*</sub> | ![Patient Review](docs/images/patient_case_review.png)<br><sub>*Deep dive into a specific patient's operational bottlenecks and auto-generated readiness checklist.*</sub> |
+### Hospital Command Center
+![Command Center](docs/images/control_tower_dashboard.png)
+*The live operational bed board showing unit capacity alongside the ML-scored discharge queue.*
 
-| Multi-Agent Committee Debate | Task & Escalation Workflow |
-|:---:|:---:|
-| ![Agent Debate](docs/images/ai_committee_debate.png)<br><sub>*The AI Committee (Safety, Operations, Director) actively debating the discharge plan using retrieved hospital policies.*</sub> | ![Tasks](docs/images/task_escalation_workflow.png)<br><sub>*Role-assigned tasks complete with SLAs, escalation timers, and an immutable audit log of ownership.*</sub> |
+### Patient Case Review
+![Patient Review](docs/images/patient_case_review.png)
+*Deep dive into a specific patient's operational bottlenecks and auto-generated readiness checklist.*
 
-| Capacity Simulator | FHIR Interoperability |
-|:---:|:---:|
-| ![Simulator](docs/images/capacity_simulator.png)<br><sub>*Counterfactual "What-If" planning to predict the bed-recovery impact of resolving specific hospital blockers.*</sub> | ![FHIR](docs/images/fhir_interoperability.png)<br><sub>*Generating a compliant FHIR R4 JSON bundle of the patient's case for seamless EHR integration.*</sub> |
+### Multi-Agent Committee Debate
+![Agent Debate](docs/images/ai_committee_debate.png)
+*The AI Committee (Safety, Operations, Director) actively debating the discharge plan using retrieved hospital policies.*
+
+### Task & Escalation Workflow
+![Tasks](docs/images/task_escalation_workflow.png)
+*Role-assigned tasks complete with SLAs, escalation timers, and an immutable audit log of ownership.*
+
+### Capacity Simulator
+![Simulator](docs/images/capacity_simulator.png)
+*Counterfactual "What-If" planning to predict the bed-recovery impact of resolving specific hospital blockers.*
+
+### FHIR Interoperability
+![FHIR](docs/images/fhir_interoperability.png)
+*Generating a compliant FHIR R4 JSON bundle of the patient's case for seamless EHR integration.*
 
 ---
 
