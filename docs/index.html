@@ -7,6 +7,11 @@
     <!-- Google Fonts: Roboto and Google Sans alternative -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Mermaid JS -->
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: { primaryColor: '#f8f9fa', primaryBorderColor: '#dadce0', primaryTextColor: '#202124', lineColor: '#4285F4', fontFamily: 'Roboto' }});
+    </script>
     <style>
         :root {
             /* Google Core Colors */
@@ -475,19 +480,19 @@
     </section>
 
     <!-- Architecture Diagram Section -->
-    <section id="architecture-diagram" class="split-section" style="margin-top: 60px; margin-bottom: 20px;">
-        <div class="split-image" style="background: transparent; border: none; padding: 0;">
-            <img src="images/system_architecture.png" alt="System Architecture Diagram" onerror="this.src='https://via.placeholder.com/600x400?text=System+Architecture+Diagram'" style="box-shadow: none; border: 1px solid var(--border-color);">
-        </div>
-        <div class="split-content">
+    <section id="architecture-diagram" class="split-section" style="margin-top: 60px; margin-bottom: 20px; grid-template-columns: 1fr;">
+        <div class="split-content" style="text-align: center; max-width: 800px; margin: 0 auto;">
             <h2>Resilient, API-first architecture.</h2>
             <p>A decoupled design that securely bridges predictive models and agentic LLMs with rigorous operational workflows.</p>
-            <ul class="check-list">
-                <li><span class="check-icon">✓</span> Flask API backend served by Waitress</li>
-                <li><span class="check-icon">✓</span> Streamlit Control Tower frontend</li>
-                <li><span class="check-icon">✓</span> Persistent JSON storage via Docker/Railway volumes</li>
-                <li><span class="check-icon">✓</span> Secure local XGBoost artifact loading</li>
-            </ul>
+        </div>
+        <div class="mermaid-container" style="background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 30px; overflow-x: auto; max-width: 800px; margin: 0 auto;">
+            <div class="mermaid" style="display: flex; justify-content: center;">
+flowchart LR
+    UI["Streamlit UI<br>(Control Tower)"] --> API["Flask API<br>(Backend)"]
+    API <--> AI["AI Models<br>(Predictive & LLMs)"]
+    API <--> DATA["Data Storage<br>(Persistent JSON)"]
+    API --> EHR["FHIR Export<br>(EHR System)"]
+            </div>
         </div>
     </section>
 
