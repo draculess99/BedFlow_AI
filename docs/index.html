@@ -247,10 +247,10 @@
         }
 
         .feature-grid {
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 32px;
         }
 
@@ -399,6 +399,9 @@
 
         /* Responsive */
         @media (max-width: 768px) {
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
             .split-section {
                 grid-template-columns: 1fr;
             }
