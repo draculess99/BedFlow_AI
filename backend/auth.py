@@ -3,7 +3,7 @@
 Stage 8 adds authenticated local demo identities, signed bearer tokens, backend
 permission enforcement, and access-event logging. This module is suitable for a
 portfolio demonstration only. Production deployments should replace it with an
-enterprise identity provider, HTTPS, secret rotation, and database-backed users.
+enterprise identity provider, HTTPS, secret rotation, and managed identity and database-backed users.
 """
 
 from __future__ import annotations
@@ -19,8 +19,10 @@ from flask import g, has_request_context, jsonify, request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from werkzeug.security import check_password_hash, generate_password_hash
 
-USERS_PATH = "database/demo_users.json"
-ACCESS_LOG_PATH = "database/access_log.json"
+from .storage import runtime_json_path
+
+USERS_PATH = runtime_json_path("demo_users.json", [])
+ACCESS_LOG_PATH = runtime_json_path("access_log.json", [])
 TOKEN_SALT = "bedflow-stage8-auth"
 TOKEN_MAX_AGE_SECONDS = int(os.getenv("BEDFLOW_TOKEN_MAX_AGE_SECONDS", "28800"))
 DEFAULT_DEMO_PASSWORD = os.getenv("BEDFLOW_DEMO_PASSWORD", "BedFlowDemo!")

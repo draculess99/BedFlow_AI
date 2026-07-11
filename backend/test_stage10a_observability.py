@@ -87,9 +87,11 @@ def test_clean_release_packager_excludes_secret_and_runtime_identity_files(tmp_p
     project = tmp_path / "bedflow_ai"
     (project / "database").mkdir(parents=True)
     (project / "backend").mkdir()
+    (project / "data").mkdir()
     (project / "backend" / "api.py").write_text("print('ok')\n")
     (project / ".env").write_text("SECRET=value\n")
     (project / "database" / "demo_users.json").write_text("[]\n")
+    (project / "data" / "audit_log.json").write_text("[{\"private\": true}]\n")
     (project / "README.md").write_text("# Test\n")
     output = tmp_path / "release.zip"
 
@@ -99,5 +101,6 @@ def test_clean_release_packager_excludes_secret_and_runtime_identity_files(tmp_p
         names = set(archive.namelist())
     assert "bedflow_ai/.env" not in names
     assert "bedflow_ai/database/demo_users.json" not in names
+    assert "bedflow_ai/data/audit_log.json" not in names
     assert "bedflow_ai/README.md" in names
     assert "bedflow_ai/backend/api.py" in names

@@ -13,7 +13,8 @@
   <img alt="FHIR" src="https://img.shields.io/badge/Interoperability-FHIR%20R4--shaped-5A67D8">
   <img alt="Simulator" src="https://img.shields.io/badge/Planning-Capacity%20Simulator-7C3AED">
   <img alt="Human supervised" src="https://img.shields.io/badge/Safety-Human%20Supervised-2E8B57">
-  <img alt="Tests" src="https://img.shields.io/badge/Automated%20Tests-20%20Passing-2E8B57">
+  <img alt="Persistent JSON" src="https://img.shields.io/badge/Persistence-JSON%20Volume-2563EB">
+  <img alt="Tests" src="https://img.shields.io/badge/Automated%20Tests-24%20Passing-2E8B57">
 </p>
 
 BedFlow AI is a portfolio-grade hospital operations command center that combines predictive analytics, discharge-readiness workflow, task coordination, agentic decision support, human accountability, capacity simulation, interoperability, and operational observability.
@@ -42,6 +43,7 @@ The application helps an authorized hospital team answer three practical questio
 - [Capacity simulator](#capacity-simulator)
 - [FHIR-shaped interoperability](#fhir-shaped-interoperability)
 - [Model quality and transparency](#model-quality-and-transparency)
+- [Persistent JSON storage](#persistent-json-storage)
 - [System operations](#system-operations)
 - [Dashboard guide](#dashboard-guide)
 - [Data and model provenance](#data-and-model-provenance)
@@ -70,6 +72,7 @@ BedFlow AI brings those signals into one operational workflow:
 - a human reviewer records the final accountable action;
 - a capacity simulator compares operational scenarios;
 - FHIR R4-shaped JSON supports interoperability demonstrations;
+- persistent JSON storage can be placed on a Railway or Docker volume without introducing PostgreSQL;
 - system health, readiness, request tracing, and metrics support reliable operation.
 
 ---
@@ -81,7 +84,7 @@ BedFlow AI brings those signals into one operational workflow:
 | **Hospital command center** | Simulated occupancy, open beds, delayed discharges, expected discharges, and ED boarding pressure by unit |
 | **Prioritized discharge queue** | Cached patient-level XGBoost scores, blockers, owners, recommended actions, and review priority |
 | **Discharge-readiness checklist** | Clinical, medication, transport, placement, insurance, home-care, and social-work requirements |
-| **Task coordination** | Role ownership, status, service-level timer, overdue state, escalation level, and immutable event history |
+| **Task coordination** | Role ownership, status, service-level timer, overdue state, escalation level, and immutable persistent JSON event history |
 | **Predictive analytics** | Discharge-delay probability, 30-day readmission probability, and expected delay hours |
 | **Model transparency** | Active patient signals, feature importance, metrics, registry, history, and model card |
 | **Agentic committee** | Patient Safety Advocate, Operations & Flow Manager, and Clinical Director synthesis |
@@ -89,6 +92,7 @@ BedFlow AI brings those signals into one operational workflow:
 | **Role-aware workflow** | Signed local identities and backend-enforced permissions for operational and clinical roles |
 | **Capacity simulator** | Counterfactual operational scenarios with before-and-after patient and unit impact |
 | **FHIR-shaped export** | De-identified Patient, Encounter, Observation, Task, CarePlan, Location, and Bundle resources |
+| **Persistent JSON storage** | Configurable runtime directory for users, tasks, audit, memory, and simulations; compatible with a Railway `/data` volume |
 | **System operations** | Liveness, readiness, version, request IDs, latency, structured logs, security headers, and administrator metrics |
 | **Delivery tooling** | Docker, Railway configuration, GitHub Actions, secret scanning, smoke checks, and clean packaging |
 
@@ -127,8 +131,12 @@ flowchart TB
     RUN --> LOGS["Request Tracing and Metrics"]
     RUN --> CI["CI and Secure Packaging"]
 
-    DATA1[("Synthetic Operational Data")] --> MODELS
-    DATA2[("Public Readmission Data")] --> MODELS
+    STATIC[("Static CSV Data and Model Artifacts")] --> MODELS
+    JSON[("Mutable JSON Runtime Stores")] --> WORK
+    JSON --> AUDIT
+    JSON --> SIM
+    VOLUME[("Optional /data Persistent Volume")] --> JSON
+
     MODELS --> QUEUE
     MODELS --> SIM
     CHECK --> TASK
@@ -137,6 +145,8 @@ flowchart TB
     HUMAN --> AUDIT
     HUMAN --> FHIR
 ```
+
+Static datasets and trained model artifacts remain inside the application package. Mutable records can be redirected with `BEDFLOW_DATA_DIR`; on Railway, mount a persistent volume at `/data` and set `BEDFLOW_DATA_DIR=/data`.
 
 ---
 
@@ -455,6 +465,64 @@ This is a lightweight transparency mechanism, not formal SHAP attribution.
 
 ---
 
+## Persistent JSON storage
+
+BedFlow AI keeps JSON rather than introducing PostgreSQL. The storage layer separates **static application assets** from **mutable runtime records**.
+
+```mermaid
+flowchart LR
+    APP["BedFlow AI Service"] --> CONFIG{"BEDFLOW_DATA_DIR set?"}
+    CONFIG -->|No| LOCAL[("database/ local JSON")]
+    CONFIG -->|Yes| EXT[("Configured runtime directory")]
+    EXT --> VOL[("Railway or Docker volume")]
+
+    STATIC[("CSV datasets, policies, joblib models")] --> APP
+    LOCAL --> MUTABLE["Users, tasks, audit, memory, simulations"]
+    VOL --> MUTABLE
+```
+
+Mutable files include:
+
+```text
+demo_users.json
+access_log.json
+tasks.json
+task_events.json
+audit_log.json
+simulation_runs.json
+bedflow_memory_state.json
+bedflow_memory_history.json
+```
+
+The application creates missing files on first startup. If an external directory is empty, packaged seed data is copied when available; otherwise safe empty/default JSON payloads are created. Existing mounted data is never replaced.
+
+### Local mode
+
+No configuration is required:
+
+```bash
+python app.py
+```
+
+To keep runtime records outside the repository:
+
+```bash
+BEDFLOW_DATA_DIR=./data python app.py
+```
+
+### Railway mode
+
+1. Attach a volume to the BedFlow AI service.
+2. Mount it at `/data`.
+3. Set `BEDFLOW_DATA_DIR=/data`.
+4. Keep the service at one replica when using JSON persistence.
+5. Confirm the directory through `/api/ready` or the **System Operations** tab.
+
+This gives the portfolio app restart-safe persistence without the cost or complexity of a separate PostgreSQL service. JSON mode is still intended for a single application instance and low write volume.
+
+
+---
+
 ## System operations
 
 The System Operations area provides application reliability and support information without altering patient scoring or workflow logic.
@@ -515,7 +583,7 @@ BedFlow AI uses a transparent hybrid data design.
 | 30-day readmission classifier | `database/readmission_training_data.csv` | Public diabetes hospital encounters transformed to the BedFlow schema |
 | Unit bed board | Fixed capacity assumptions and proxy pressure fields | Simulated operational snapshot |
 | Capacity simulator | Counterfactual operational inputs followed by saved-model inference | Demonstration planning estimate |
-| Tasks, audit, memory, users, scenarios | Local JSON stores | Single-process demonstration persistence |
+| Tasks, audit, memory, users, scenarios | JSON stores resolved through `BEDFLOW_DATA_DIR` | Persistent single-instance demonstration storage when backed by a volume |
 
 Raw public readmission source:
 
@@ -667,7 +735,7 @@ BedFlowDemo!
 | `socialworker` | Jamie Brooks | Social Worker |
 | `transport` | Morgan Davis | Transport Coordinator |
 
-Set `BEDFLOW_DEMO_PASSWORD` before the first startup to choose a different initial password. The generated password hashes are stored locally in `database/demo_users.json`.
+Set `BEDFLOW_DEMO_PASSWORD` before the first startup to choose a different initial password. The generated password hashes are stored in `<BEDFLOW_DATA_DIR>/demo_users.json`; without that variable, the app uses `database/demo_users.json`.
 
 > Do not expose the default password or local identity store on an internet-facing deployment.
 
@@ -688,6 +756,7 @@ Set `BEDFLOW_DEMO_PASSWORD` before the first startup to choose a different initi
 | `BEDFLOW_TOKEN_MAX_AGE_SECONDS` | `28800` | Token lifetime in seconds |
 | `BEDFLOW_LOG_LEVEL` | `INFO` | API log level |
 | `BEDFLOW_LOG_FORMAT` | `json` | Structured `json` or readable `text` logs |
+| `BEDFLOW_DATA_DIR` | `database/` locally; `/data` in Docker | Directory for mutable JSON users, tasks, audit, memory, access events, and simulations |
 | `BEDFLOW_REQUIRE_STRONG_SECRETS` | `false` | Fail readiness when the fallback secret is active |
 | `GROQ_API_KEY` | Unset | Optional Groq committee mode |
 | `GEMINI_API_KEY` | Unset | Optional Gemini committee mode |
@@ -698,14 +767,38 @@ Never commit `.env`.
 
 ## Docker and Railway
 
-Build and run locally:
+Build and run locally with a named Docker volume:
 
 ```bash
 docker build -t bedflow-ai .
-docker run --rm -p 8501:8501 bedflow-ai
+docker run --rm -p 8501:8501 -v bedflow-data:/data bedflow-ai
 ```
 
-The included `Dockerfile`, `Procfile`, and `railway.json` support a single-service deployment in which Streamlit is public and the Flask API runs internally in the same container.
+The Docker image uses:
+
+```text
+BEDFLOW_DATA_DIR=/data
+```
+
+For Railway, keep BedFlow AI as one service:
+
+```text
+BedFlow AI service
+├── Streamlit dashboard
+├── Flask and Waitress API
+├── XGBoost artifacts
+└── /data persistent volume
+```
+
+Railway setup:
+
+1. Open the BedFlow AI service.
+2. Add a persistent volume mounted at `/data`.
+3. Add `BEDFLOW_DATA_DIR=/data` to the service variables.
+4. Deploy one service replica.
+5. Check `/api/ready` and confirm `storage.runtime_data_dir` is `/data`.
+
+The included `Dockerfile`, `Procfile`, and `railway.json` support a single-service deployment in which Streamlit is public and the Flask API runs internally in the same container. No PostgreSQL service is required.
 
 The public container health check uses:
 
@@ -720,7 +813,7 @@ The internal API provides:
 /api/ready
 ```
 
-Store API keys and authentication secrets in the deployment platform’s secret manager rather than in the repository.
+Store API keys and authentication secrets in Railway variables rather than in the repository.
 
 Create a clean distributable archive:
 
@@ -763,7 +856,7 @@ Run the broader backend smoke check:
 python backend/smoke_test_bedflow.py
 ```
 
-The packaged suite contains **20 automated tests** covering:
+The packaged suite contains **24 automated tests** covering:
 
 - FHIR bundle structure;
 - batch XGBoost queue scoring;
@@ -779,6 +872,8 @@ The packaged suite contains **20 automated tests** covering:
 - scenario history and CSV export;
 - request IDs, timing, security headers, readiness, version, and metrics;
 - secret scanning and clean packaging;
+- configurable external JSON runtime directories;
+- first-start seed creation and preservation of existing mounted records;
 - dataset, model, committee, memory, and API smoke checks.
 
 GitHub Actions runs secret scanning, source compilation, tests, smoke checks, and clean archive creation.
@@ -813,6 +908,7 @@ bedflow_ai/
 │   ├── memory.py
 │   ├── observability.py
 │   ├── readiness.py
+│   ├── storage.py
 │   └── test_*.py
 ├── frontend/
 │   └── dashboard.py
@@ -835,9 +931,11 @@ bedflow_ai/
 │   ├── readmission_training_data.csv
 │   ├── model_metrics.json
 │   ├── model_metrics_history.json
-│   └── runtime JSON stores
+│   └── local runtime JSON seeds/stores
 ├── dataset_diabetes/
+├── data/                         # optional local BEDFLOW_DATA_DIR
 └── docs/
+    ├── PERSISTENT_JSON_STORAGE.md
     └── implementation and architecture notes
 ```
 
@@ -847,18 +945,11 @@ bedflow_ai/
 
 ```mermaid
 flowchart LR
-    NOW["Current platform"] --> DB["Transactional PostgreSQL persistence"]
-    DB --> VALID["Stronger model validation and SHAP"]
-    VALID --> PRESENT["Portfolio presentation assets"]
-    PRESENT --> ENTERPRISE["Optional enterprise identity and EHR integration"]
+    NOW["Feature-complete portfolio platform"] --> VALID["Stronger model validation and SHAP"]
+    VALID --> PRESENT["Screenshots, video, and landing page"]
+    PRESENT --> DATA["Optional real operational dataset"]
+    DATA --> ENTERPRISE["Optional enterprise identity and EHR integration"]
 ```
-
-### Transactional persistence
-
-- replace mutable JSON user, task, event, audit, memory, and simulation stores with PostgreSQL;
-- add schema migrations, transactions, uniqueness rules, and foreign-key constraints;
-- migrate existing local records safely;
-- add database readiness, backup, restore, retention, and concurrency tests.
 
 ### Model validation and explainability
 
@@ -876,11 +967,19 @@ flowchart LR
 - include static diagram images as a fallback for Mermaid rendering;
 - write a concise recruiter-facing project summary.
 
+### Optional data strengthening
+
+- retain the public readmission dataset as the strongest analytical component;
+- replace synthetic discharge-flow data only if a suitable public operational dataset becomes available;
+- keep synthetic model metrics clearly labeled as demonstration results.
+
 ### Optional enterprise integration
 
 - replace local authentication with SSO or OIDC, MFA, and managed sessions;
 - use HTTPS and production secret management;
 - add SMART on FHIR and validated terminology only for genuine EHR integration.
+
+PostgreSQL is intentionally not part of the current roadmap. The app remains a JSON-backed, single-instance portfolio prototype with optional volume persistence.
 
 ---
 
@@ -890,7 +989,7 @@ flowchart LR
 - Operational delay models use synthetic and proxy data.
 - The readmission model uses a diabetes-focused public dataset as a proxy for a broader discharge population.
 - Capacity-simulator results are counterfactual associations, not causal forecasts or guaranteed bed recovery.
-- Local JSON persistence is unsuitable for concurrent, multi-user production workloads.
+- Persistent JSON storage supports restart-safe single-instance demos, but it is not suitable for multiple replicas or high-concurrency production workloads.
 - In-process request metrics reset when the API restarts.
 - Local signed authentication is not enterprise SSO, MFA, or hospital identity governance.
 - The FHIR output is R4-shaped demonstration JSON rather than certified conformance.

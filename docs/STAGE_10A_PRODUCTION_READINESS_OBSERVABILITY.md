@@ -36,4 +36,4 @@ Permissions-Policy
 
 The included request metrics are process-local and reset when the API restarts. Logs should be shipped to a managed platform for persistent production monitoring.
 
-Stage 10A does not replace the JSON data stores. Transactional PostgreSQL persistence remains the next production increment.
+The observability layer is complemented by configurable persistent JSON storage. Set `BEDFLOW_DATA_DIR=/data` and mount a volume for a restart-safe single-instance deployment. PostgreSQL is intentionally deferred for the portfolio version.

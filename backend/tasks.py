@@ -2,7 +2,7 @@
 
 Stage 3 converts discharge blockers into operational tasks with owners,
 statuses, SLA timers, overdue flags, and escalation levels. This is still a
-local JSON-backed demonstration layer, not a production workflow engine.
+persistent JSON-backed demonstration layer, not a production workflow engine.
 """
 
 from __future__ import annotations
@@ -15,8 +15,10 @@ import uuid
 from collections import Counter, defaultdict
 from typing import Any
 
-TASKS_PATH = "database/tasks.json"
-TASK_EVENTS_PATH = "database/task_events.json"
+from .storage import runtime_json_path
+
+TASKS_PATH = runtime_json_path("tasks.json", [])
+TASK_EVENTS_PATH = runtime_json_path("task_events.json", [])
 
 VALID_STATUSES = [
     "Not Started",

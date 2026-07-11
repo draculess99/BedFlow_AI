@@ -76,7 +76,7 @@ GET  /api/simulations/export.csv
 Saved scenarios are written to:
 
 ```text
-database/simulation_runs.json
+<BEDFLOW_DATA_DIR>/simulation_runs.json
 ```
 
 This JSON store is for a local portfolio demo. A production system should use transactional database storage with immutable event history and retention controls.

@@ -47,6 +47,7 @@ from .tasks import (
 )
 from .observability import APP_VERSION, UPGRADE_STAGE, configure_observability, metrics_snapshot
 from .readiness import build_readiness_report
+from .storage import runtime_storage_status
 from .simulator import (
     list_simulation_runs,
     run_capacity_simulation,
@@ -99,6 +100,7 @@ def health():
         "simulation_ready": True,
         "observability_ready": True,
         "authentication": auth_status(),
+        "storage": runtime_storage_status(),
     })
 
 
@@ -117,6 +119,15 @@ def system_version():
         "app_version": APP_VERSION,
         "upgrade_stage": UPGRADE_STAGE,
         "completed_stages": [1, 2, 3, 4, 5, 6, 7, 8, 9, "10A"],
+        "persistence": runtime_storage_status(),
+        "capabilities": [
+            "model-scored discharge queue",
+            "role-aware workflow",
+            "capacity what-if simulator",
+            "FHIR R4-shaped export",
+            "persistent JSON runtime directory",
+            "health, readiness, metrics, and CI",
+        ],
     })
 
 

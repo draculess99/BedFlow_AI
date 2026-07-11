@@ -15,10 +15,10 @@ from .models import (
     bedflow_models,
 )
 from .observability import APP_VERSION, UPGRADE_STAGE
+from .storage import runtime_storage_status
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATABASE_DIR = PROJECT_ROOT / "database"
 
 
 def _check(name: str, ok: bool, detail: str, critical: bool = True) -> dict[str, Any]:
@@ -67,8 +67,16 @@ def build_readiness_report() -> dict[str, Any]:
         )
     )
 
-    writable, writable_detail = _writable_directory(DATABASE_DIR)
-    checks.append(_check("runtime_storage", writable, writable_detail))
+    storage = runtime_storage_status()
+    runtime_directory = Path(storage["runtime_data_dir"])
+    writable, writable_detail = _writable_directory(runtime_directory)
+    checks.append(
+        _check(
+            "runtime_storage",
+            writable,
+            f"{writable_detail}; mode={storage['mode']}",
+        )
+    )
 
     strong_secret = bool(AUTH_SECRET and AUTH_SECRET != DEFAULT_AUTH_SECRET and len(AUTH_SECRET) >= 24)
     require_strong = os.getenv("BEDFLOW_REQUIRE_STRONG_SECRETS", "false").lower() == "true"
@@ -83,11 +91,21 @@ def build_readiness_report() -> dict[str, Any]:
         )
     )
 
+    persistence_detail = (
+        f"Mutable JSON stores use {storage['runtime_data_dir']}. "
+        + (
+            "An external runtime directory is configured; attach a persistent volume at that path "
+            "to preserve records across restarts and redeployments."
+            if storage["external_runtime_directory"]
+            else "Set BEDFLOW_DATA_DIR=/data and attach a Railway volume to preserve records across redeployments."
+        )
+        + " JSON mode is intended for one application instance rather than concurrent replicas."
+    )
     checks.append(
         _check(
             "persistence_mode",
             False,
-            "Local JSON persistence is active. It is acceptable for a single-user demo but not concurrent production use.",
+            persistence_detail,
             critical=False,
         )
     )
@@ -106,6 +124,7 @@ def build_readiness_report() -> dict[str, Any]:
         "timestamp_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "model_version": bedflow_models.model_version,
         "authentication": auth_status(),
+        "storage": storage,
         "checks": checks,
         "summary": {
             "passed": sum(item["status"] == "pass" for item in checks),

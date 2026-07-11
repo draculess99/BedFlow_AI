@@ -8,7 +8,7 @@ Before this stage, the system could identify discharge blockers and show a readi
 
 ## What this stage adds
 
-- Local task workflow store: `database/tasks.json`
+- Local task workflow store: `<BEDFLOW_DATA_DIR>/tasks.json` (defaults to `<BEDFLOW_DATA_DIR>/tasks.json`)
 - New backend module: `backend/tasks.py`
 - Task generation from discharge checklist blockers
 - Owner roles for each task
@@ -153,7 +153,7 @@ POST /api/tasks/update_status
 
 ```text
 backend/tasks.py
-database/tasks.json
+<BEDFLOW_DATA_DIR>/tasks.json
 docs/STAGE_3_TASK_OWNERSHIP_AND_ESCALATION.md
 ```
 

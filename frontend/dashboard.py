@@ -920,7 +920,7 @@ def display_tasks_and_escalations_tab():
                 else:
                     st.error(f"Task generation failed: {res.text}")
     with c2:
-        st.caption("Tasks are stored locally in database/tasks.json for demo purposes. In production this would be a database-backed workflow queue.")
+        st.caption("Tasks use JSON persistence. Set BEDFLOW_DATA_DIR to a mounted directory (recommended: /data on Railway) to preserve task and audit history across redeployments.")
 
     summary = load_task_summary()
     s1, s2, s3, s4, s5 = st.columns(5)

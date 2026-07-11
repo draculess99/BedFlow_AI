@@ -45,3 +45,7 @@ database/tasks.json
 database/simulation_runs.json
 database/bedflow_memory_history.json
 database/bedflow_memory_state.json
+
+# Optional mounted/local runtime directory
+/data/
+*.json.tmp

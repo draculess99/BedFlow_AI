@@ -276,5 +276,135 @@
         "outcome_proxy": "Unknown",
         "memory_reasoning": "Appended from human decision.",
         "timestamp": "2026-07-11 04:47:37.079655"
+    },
+    {
+        "patient_id": "PT0456",
+        "scenario_signature": {
+            "primary_bottleneck": "Rehab/SNF",
+            "readmission_risk_level": "High",
+            "delay_risk_level": "Critical",
+            "discharge_destination": "SNF",
+            "home_support_level": "Fair",
+            "bed_occupancy_percent": 98,
+            "ed_boarding_count": 20
+        },
+        "model_outputs": {
+            "delay_risk_level": "Critical",
+            "discharge_delay_risk_probability": 0.9909795522689819,
+            "model_version": "bedflow-xgb-20260711T055014Z",
+            "predicted_delay_hours": 17.9,
+            "prediction_source": "saved XGBoost artifacts",
+            "prediction_timestamp_utc": "2026-07-11T09:19:32+00:00",
+            "readmission_risk_level": "High",
+            "readmission_risk_probability": 0.7602707743644714
+        },
+        "research_outputs": {
+            "bed_capacity": {
+                "bed_pressure_level": "Critical",
+                "ed_boarding_relief_level": "Critical",
+                "estimated_bed_recovery_value": "High (Boarding Relief)",
+                "recommended_action": "Prioritize this discharge to open bed for ED boarder"
+            },
+            "home_care": {
+                "home_care_delay_reason": "Cleared",
+                "home_care_pressure_level": "Low",
+                "recommended_action": "None"
+            },
+            "insurance": {
+                "insurance_delay_reason": "Facility auth pending",
+                "insurance_pressure_level": "Critical",
+                "recommended_action": "Urgent review by utilization management"
+            },
+            "pharmacy": {
+                "pharmacy_delay_reason": "Cleared",
+                "pharmacy_pressure_level": "Low",
+                "recommended_action": "None"
+            },
+            "rehab": {
+                "placement_delay_reason": "Awaiting bed at facility",
+                "placement_pressure_level": "Critical",
+                "recommended_action": "Escalate to case manager / social work"
+            },
+            "safety": {
+                "patient_safety_level": "High",
+                "recommended_action": "Ensure post-discharge appointments and support are locked in.",
+                "safety_reason": "High readmission risk"
+            },
+            "transport": {
+                "recommended_action": "None",
+                "transport_delay_reason": "Cleared",
+                "transport_pressure_level": "Low"
+            }
+        },
+        "committee_recommendation": "Hold discharge until safety criteria met",
+        "human_decision": "Approve",
+        "outcome_proxy": "Unknown",
+        "memory_reasoning": "Appended from human decision.",
+        "timestamp": "2026-07-11 05:20:20.077168"
+    },
+    {
+        "patient_id": "PT0447",
+        "scenario_signature": {
+            "primary_bottleneck": "Rehab/SNF",
+            "readmission_risk_level": "High",
+            "delay_risk_level": "Critical",
+            "discharge_destination": "Rehab",
+            "home_support_level": "None",
+            "bed_occupancy_percent": 95,
+            "ed_boarding_count": 22
+        },
+        "model_outputs": {
+            "delay_risk_level": "Critical",
+            "discharge_delay_risk_probability": 0.9849146604537964,
+            "model_version": "bedflow-xgb-20260711T055014Z",
+            "predicted_delay_hours": 22.5,
+            "prediction_source": "saved XGBoost artifacts",
+            "prediction_timestamp_utc": "2026-07-11T09:39:41+00:00",
+            "readmission_risk_level": "High",
+            "readmission_risk_probability": 0.6748038530349731
+        },
+        "research_outputs": {
+            "bed_capacity": {
+                "bed_pressure_level": "Critical",
+                "ed_boarding_relief_level": "Critical",
+                "estimated_bed_recovery_value": "High (Boarding Relief)",
+                "recommended_action": "Prioritize this discharge to open bed for ED boarder"
+            },
+            "home_care": {
+                "home_care_delay_reason": "Cleared",
+                "home_care_pressure_level": "Low",
+                "recommended_action": "None"
+            },
+            "insurance": {
+                "insurance_delay_reason": "Facility auth pending",
+                "insurance_pressure_level": "Critical",
+                "recommended_action": "Urgent review by utilization management"
+            },
+            "pharmacy": {
+                "pharmacy_delay_reason": "Complex MedRec pending",
+                "pharmacy_pressure_level": "High",
+                "recommended_action": "Flag for priority pharmacy review"
+            },
+            "rehab": {
+                "placement_delay_reason": "Awaiting bed at facility",
+                "placement_pressure_level": "Critical",
+                "recommended_action": "Escalate to case manager / social work"
+            },
+            "safety": {
+                "patient_safety_level": "Low",
+                "recommended_action": "Proceed with standard discharge",
+                "safety_reason": "Stable"
+            },
+            "transport": {
+                "recommended_action": "None",
+                "transport_delay_reason": "Cleared",
+                "transport_pressure_level": "Low"
+            }
+        },
+        "committee_recommendation": "Hold discharge",
+        "human_decision": "Approve",
+        "outcome_proxy": "Unknown",
+        "memory_reasoning": "Appended from human decision.",
+        "timestamp": "2026-07-11 05:39:59.357180"
     }
 ]

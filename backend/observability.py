@@ -22,7 +22,7 @@ from flask import Flask, g, jsonify, request
 from werkzeug.exceptions import HTTPException
 
 
-APP_VERSION = "10.1.0-stage10a"
+APP_VERSION = "10.2.0-persistent-json"
 UPGRADE_STAGE = "10A"
 
 

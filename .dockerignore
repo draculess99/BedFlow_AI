@@ -20,3 +20,7 @@ database/simulation_runs.json
 database/bedflow_memory_history.json
 database/bedflow_memory_state.json
 dist/
+
+# Mounted runtime data is created outside the image
+data/
+*.json.tmp

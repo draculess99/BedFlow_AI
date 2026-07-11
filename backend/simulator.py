@@ -24,6 +24,8 @@ from typing import Any, Callable
 
 import pandas as pd
 
+from .storage import runtime_json_path
+
 from .command_center import (
     RISK_ORDER,
     UNIT_CAPACITY,
@@ -32,7 +34,7 @@ from .command_center import (
     infer_unit,
 )
 
-SIMULATION_RUNS_PATH = "database/simulation_runs.json"
+SIMULATION_RUNS_PATH = runtime_json_path("simulation_runs.json", [])
 SIMULATION_UNITS = ["All Units"] + [
     unit for unit in UNIT_CAPACITY if unit != "Emergency Department"
 ]

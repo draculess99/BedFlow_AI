@@ -19,6 +19,12 @@ import sys
 import time
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from backend.storage import initialize_runtime_storage
+
 
 ROOT_DIR = Path(__file__).resolve().parent
 
@@ -156,6 +162,8 @@ def main() -> None:
     print("=" * 72)
 
     try:
+        storage = initialize_runtime_storage()
+        print(f"✅ Runtime JSON storage: {storage['runtime_data_dir']} ({storage['mode']})")
         generate_dataset_if_missing()
         generate_readmission_dataset_if_missing()
 

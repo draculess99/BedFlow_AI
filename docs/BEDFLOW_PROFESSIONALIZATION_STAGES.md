@@ -167,17 +167,21 @@ Implemented:
 Important limitation:
 
 - request metrics are process-local and reset on restart;
-- the current JSON stores are still single-user demonstration persistence.
+- JSON stores remain single-instance demonstration persistence; mount `/data` to preserve them across redeployments.
 
-## Stage 10B — Transactional Persistence ⏳
+## Persistent JSON Volume Support ✅
 
-Recommended next implementation:
+Implemented:
 
-- PostgreSQL-backed users, tasks, task events, audit records, memory, access events, and simulations;
-- schema migrations and transaction boundaries;
-- uniqueness and foreign-key constraints;
-- JSON-to-database migration tooling;
-- database readiness, backup, restore, retention, and concurrency tests.
+- `BEDFLOW_DATA_DIR` separates mutable JSON records from static datasets and model artifacts;
+- Railway and Docker deployments can mount `/data` for restart-safe persistence;
+- missing runtime files are seeded once and existing mounted data is never overwritten;
+- users, access events, tasks, task events, audit records, simulations, and memory use the configured directory;
+- readiness and version endpoints report the active storage mode;
+- atomic memory writes and clean release exclusions protect runtime files;
+- PostgreSQL is intentionally deferred for this single-instance portfolio deployment.
+
+JSON storage remains unsuitable for multiple replicas or high-concurrency production use.
 
 ## Stage 10C — Model Validation and Explainability ⏳
 
@@ -203,4 +207,4 @@ Enterprise SSO/OIDC, MFA, HTTPS, and SMART on FHIR should only be added for a ge
 
 ## Recommended next implementation
 
-Build **Stage 10B transactional PostgreSQL persistence** next. The app now has CI, request tracing, readiness checks, and operational diagnostics; the largest remaining engineering weakness is concurrent-safe durable storage.
+Focus next on **model validation and explainability**: patient-group splitting, probability calibration, threshold analysis, precision-recall evaluation, and formal SHAP. The application feature set is already complete for a JSON-backed portfolio demonstration.

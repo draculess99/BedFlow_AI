@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 EXCLUDED_PARTS = {
-    ".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist",
+    ".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist", "data",
 }
 EXCLUDED_NAMES = {
     ".env", ".DS_Store", "Thumbs.db", "demo_users.json", "access_log.json",

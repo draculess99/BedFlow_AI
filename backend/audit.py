@@ -1,7 +1,7 @@
 """Append-only audit records for human-supervised BedFlow decisions.
 
-This remains a JSON-backed portfolio implementation. Production deployments
-should use authenticated identities and a transactional database.
+This remains a persistent JSON-backed portfolio implementation. Public demos
+should use a mounted runtime directory and a single application instance.
 """
 
 from __future__ import annotations
@@ -12,7 +12,9 @@ import os
 import uuid
 from typing import Any
 
-AUDIT_LOG_PATH = "database/audit_log.json"
+from .storage import runtime_json_path
+
+AUDIT_LOG_PATH = runtime_json_path("audit_log.json", [])
 
 
 def init_audit_log() -> None:

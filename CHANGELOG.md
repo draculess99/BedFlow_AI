@@ -1,5 +1,14 @@
 # Changelog
 
+## Persistent JSON volume support
+
+- Added `BEDFLOW_DATA_DIR` to separate mutable JSON records from static application assets.
+- Added first-start seeding for users, tasks, audit records, simulations, access events, and memory files.
+- Added atomic memory writes and absolute runtime paths.
+- Added Railway and Docker `/data` volume guidance.
+- Extended readiness and version output with storage-mode details.
+- Kept PostgreSQL out of the portfolio architecture.
+
 ## 2026-07-11 — Stage 10A Production Readiness and Observability
 
 ### Added
@@ -8,7 +17,7 @@
 - Request ID, response-time, no-sniff, frame, referrer, browser-permission, and sensitive-cache headers.
 - `/api/ready`, `/api/system/version`, and administrator-protected `/api/metrics` endpoints.
 - System Operations dashboard tab with readiness checks and request diagnostics.
-- GitHub Actions CI for secret scanning, compilation, 20 automated tests, smoke checks, and clean packaging.
+- GitHub Actions CI for secret scanning, compilation, 24 automated tests, smoke checks, and clean packaging.
 - Secret-scanning and release-packaging scripts.
 - Docker and Railway health-check improvements.
 - Stage 10A documentation and six new tests.
@@ -16,11 +25,11 @@
 ### Changed
 
 - `/api/health` is now a lightweight liveness endpoint with app version and Stage 10A status.
-- README and roadmap now separate Stage 10A completion from Stage 10B persistence and Stage 10C model validation.
+- README and roadmap now describe observability, persistent JSON storage, model validation, and portfolio presentation as product capabilities and engineering priorities.
 
 ### Remaining limitation
 
-- Runtime tasks, audit records, memory, identities, access events, and simulations still use local JSON persistence. PostgreSQL is the next planned increment.
+- Runtime records use JSON persistence. Set BEDFLOW_DATA_DIR=/data and attach a volume for restart-safe single-instance deployment; relational storage is intentionally deferred.
 
 ## 2026-07-11 — Stage 9 Capacity What-If Simulator
 
