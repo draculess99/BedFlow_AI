@@ -487,11 +487,33 @@
         </div>
         <div class="mermaid-container" style="background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 30px; overflow-x: auto; max-width: 800px; margin: 0 auto;">
             <div class="mermaid" style="display: flex; justify-content: center;">
-flowchart LR
-    UI["Streamlit UI<br>(Control Tower)"] --> API["Flask API<br>(Backend)"]
-    API <--> AI["AI Models<br>(Predictive & LLMs)"]
-    API <--> DATA["Data Storage<br>(Persistent JSON)"]
-    API --> EHR["FHIR Export<br>(EHR System)"]
+flowchart TB
+    UI["Control Tower UI (Streamlit)"] --> API["Flask Backend API"]
+
+    subgraph Core ["Core Processing"]
+        API --> OPS["Operational Logic"]
+        API --> AI["Intelligence Layer"]
+        API --> WORK["Workflow & Tasks"]
+    end
+
+    subgraph Intelligence ["AI & Machine Learning"]
+        AI --> ML["Predictive Models (XGBoost)"]
+        AI --> AGENT["Multi-Agent Committee (LLMs)"]
+    end
+
+    subgraph Operations ["Hospital Flow"]
+        OPS --> BOARD["Unit Bed Board"]
+        OPS --> SIM["Capacity Simulator"]
+    end
+
+    subgraph Coordination ["Task Management"]
+        WORK --> CHECK["Readiness Checklist"]
+        WORK --> TASK["Role-Owned Tasks"]
+        WORK --> HUMAN["Human Review & Audit"]
+    end
+
+    API <--> DATA[("Persistent JSON Storage")]
+    API --> FHIR["FHIR R4 Export Integration"]
             </div>
         </div>
     </section>
