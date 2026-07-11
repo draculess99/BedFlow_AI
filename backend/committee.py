@@ -262,7 +262,8 @@ Your sole focus is hospital capacity and throughput. Review the following patien
         def call_llm(prompt, is_json=False):
             if decision_system == "Groq":
                 from groq import Groq
-                client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+                raw_key = os.environ.get("GROQ_API_KEY", "")
+                client = Groq(api_key=raw_key.strip() if raw_key else None)
                 kwargs = {
                     "model": model_name or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
                     "messages": [{"role": "user", "content": prompt}],
