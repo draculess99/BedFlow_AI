@@ -13,6 +13,12 @@
       mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: { primaryColor: '#f8f9fa', primaryBorderColor: '#dadce0', primaryTextColor: '#202124', lineColor: '#4285F4', fontFamily: 'Roboto' }});
     </script>
     <style>
+        /* Mermaid overrides for visibility */
+        .mermaid .node text, .mermaid .cluster text, .mermaid .edgeLabel text {
+            font-size: 16px !important;
+            font-weight: 700 !important;
+        }
+        
         :root {
             /* Google Core Colors */
             --google-blue: #4285F4;
@@ -481,11 +487,11 @@
 
     <!-- Architecture Diagram Section -->
     <section id="architecture-diagram" class="split-section" style="margin-top: 60px; margin-bottom: 20px; grid-template-columns: 1fr;">
-        <div class="split-content" style="text-align: center; max-width: 800px; margin: 0 auto;">
+        <div class="split-content" style="text-align: center; max-width: 1000px; margin: 0 auto;">
             <h2>Resilient, API-first architecture.</h2>
             <p>A decoupled design that securely bridges predictive models and agentic LLMs with rigorous operational workflows.</p>
         </div>
-        <div class="mermaid-container" style="background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 30px; overflow-x: auto; max-width: 800px; margin: 0 auto;">
+        <div class="mermaid-container" style="background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 40px; overflow-x: auto; max-width: 1000px; margin: 0 auto;">
             <div class="mermaid" style="display: flex; justify-content: center;">
 flowchart TB
     UI["Control Tower UI (Streamlit)"] --> API["Flask Backend API"]
