@@ -1,9 +1,14 @@
 """Hospital command-center helpers for BedFlow AI.
 
-Stage 1 turns the original single-patient demo into a hospital-style
-operations dashboard. These helpers deliberately avoid model inference so the
-command center loads quickly. The queue uses operational proxy fields that are
-already present in the synthetic BedFlow dataset.
+The command center combines two clearly separated layers:
+
+1. A simulated/proxy hospital capacity snapshot for portfolio demonstration.
+2. Patient-level XGBoost predictions loaded from the published model artifacts.
+
+The queue never trains models and never uses known outcome/target columns to
+rank current patients. If model scoring is temporarily unavailable, it falls
+back to conservative operational heuristics that use only information that
+would be available at review time.
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ UNIT_CAPACITY = {
 }
 
 RISK_ORDER = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}
+RISK_PROBABILITY_FALLBACK = {"Low": 0.15, "Medium": 0.35, "High": 0.65, "Critical": 0.88}
 
 OWNER_BY_BOTTLENECK = {
     "Clinical Stability": "Physician",
@@ -50,7 +56,7 @@ NEXT_ACTION_BY_BOTTLENECK = {
 
 def _to_int(value: Any, default: int = 0) -> int:
     try:
-        return int(value)
+        return int(float(value))
     except (TypeError, ValueError):
         return default
 
@@ -72,12 +78,14 @@ def _risk_badge(level: str) -> str:
     return badges.get(level, level)
 
 
-def infer_unit(row: pd.Series | dict[str, Any]) -> str:
-    """Infer a hospital unit from the available demo fields.
+def _percentage(value: float | None) -> str:
+    if value is None:
+        return "—"
+    return f"{max(0.0, min(1.0, float(value))) * 100:.0f}%"
 
-    The dataset does not contain a real unit/ward column, so this creates a
-    realistic operational proxy for the command-center screen.
-    """
+
+def infer_unit(row: pd.Series | dict[str, Any]) -> str:
+    """Infer a demonstration unit because the source data has no ward field."""
     diagnosis = str(row.get("diagnosis_group", "General Medicine"))
     acuity = str(row.get("acuity_level", "Medium"))
 
@@ -102,35 +110,65 @@ def pressure_level_from_occupancy(occupancy_percent: float, ed_boarders: int = 0
     return "Low"
 
 
-def estimate_delay_risk(row: pd.Series | dict[str, Any]) -> str:
-    hours = _to_float(row.get("expected_discharge_delay_hours", 0))
-    delayed = _to_int(row.get("delayed_discharge", 0))
-    occ = _to_float(row.get("current_bed_occupancy_percent", 80))
-    boarders = _to_int(row.get("ed_boarding_count", 0))
-    bottleneck = str(row.get("primary_discharge_bottleneck", "None"))
+def estimate_delay_hours_fallback(row: pd.Series | dict[str, Any]) -> float:
+    """Prospective operational fallback that excludes outcome/target columns."""
+    score = 1.0
+    score += min(_to_float(row.get("length_of_stay_days", 0)), 20) * 0.35
+    score += 3.0 * _to_int(row.get("doctor_signoff_pending", 0))
+    score += 3.5 * _to_int(row.get("pharmacy_med_rec_pending", 0))
+    score += 2.5 * _to_int(row.get("transport_pending", 0))
+    score += 6.0 * _to_int(row.get("insurance_authorization_pending", 0))
+    score += 8.0 * _to_int(row.get("rehab_snf_placement_pending", 0))
+    score += 4.0 * _to_int(row.get("home_care_setup_pending", 0))
+    score += 3.0 * _to_int(row.get("social_work_pending", 0))
+    score += 2.0 * _to_int(row.get("weekend_discharge_flag", 0))
+    score += 1.5 * _to_int(row.get("after_hours_flag", 0))
 
-    if hours >= 16 or (delayed and occ >= 95 and boarders > 10):
+    if str(row.get("lab_stability_flag", "Stable")) == "Unstable":
+        score += 6.0
+    if str(row.get("vital_sign_stability_flag", "Stable")) == "Unstable":
+        score += 6.0
+    if _to_float(row.get("current_bed_occupancy_percent", 0)) >= 90:
+        score += 2.0
+    score += min(_to_int(row.get("ed_boarding_count", 0)), 20) * 0.15
+    return round(min(max(score, 0.0), 36.0), 1)
+
+
+def estimate_delay_risk(row: pd.Series | dict[str, Any]) -> str:
+    """Fallback delay band using only prospective operational inputs."""
+    hours = estimate_delay_hours_fallback(row)
+    unstable = (
+        str(row.get("lab_stability_flag", "Stable")) == "Unstable"
+        or str(row.get("vital_sign_stability_flag", "Stable")) == "Unstable"
+    )
+    if unstable or hours >= 18:
         return "Critical"
-    if delayed or hours >= 8 or bottleneck in {"Insurance", "Rehab/SNF", "Clinical Stability"}:
+    if hours >= 10:
         return "High"
-    if hours >= 4 or bottleneck not in {"None", ""}:
+    if hours >= 5:
         return "Medium"
     return "Low"
 
 
 def estimate_readmission_risk(row: pd.Series | dict[str, Any]) -> str:
-    readmitted = _to_int(row.get("readmitted_30_days", 0))
-    prior_readmits = _to_int(row.get("prior_readmissions_12mo", 0))
-    prior_admissions = _to_int(row.get("prior_admissions_6mo", 0))
-    meds = _to_int(row.get("medication_count", 0))
-    labs = str(row.get("lab_stability_flag", "Stable"))
-    vitals = str(row.get("vital_sign_stability_flag", "Stable"))
+    """Fallback readmission band without using readmitted_30_days."""
+    points = 0
+    points += min(_to_int(row.get("prior_readmissions_12mo", 0)), 3) * 3
+    points += min(_to_int(row.get("prior_admissions_6mo", 0)), 5)
+    points += min(_to_int(row.get("prior_ed_visits_6mo", 0)), 5)
+    points += 2 if _to_int(row.get("medication_count", 0)) >= 12 else 0
+    points += 1 if _to_int(row.get("medication_count", 0)) >= 8 else 0
+    points += 2 if _to_int(row.get("lives_alone", 0)) else 0
+    points += 2 if str(row.get("home_support_level", "Good")) == "Limited" else 0
+    points += 3 if str(row.get("lab_stability_flag", "Stable")) == "Unstable" else 0
+    points += 3 if str(row.get("vital_sign_stability_flag", "Stable")) == "Unstable" else 0
+    points += 1 if _to_int(row.get("age", 0)) >= 75 else 0
 
-    if labs == "Unstable" or vitals == "Unstable" or (readmitted and prior_readmits >= 2):
+    if points >= 13:
         return "Critical"
-    if readmitted or prior_readmits >= 2 or prior_admissions >= 4 or meds >= 15:
+    if points >= 8:
         return "High"
-    if prior_readmits == 1 or prior_admissions >= 2 or meds >= 8:
+    if points >= 4:
         return "Medium"
     return "Low"
 
@@ -154,8 +192,17 @@ def estimate_case_status(row: pd.Series | dict[str, Any], delay_risk: str, readm
     return "Ready / Routine"
 
 
-def bed_recovery_score(row: pd.Series | dict[str, Any], delay_risk: str, readmission_risk: str) -> float:
-    hours = _to_float(row.get("expected_discharge_delay_hours", 0))
+def bed_recovery_score(
+    row: pd.Series | dict[str, Any],
+    delay_risk: str,
+    readmission_risk: str,
+    predicted_delay_hours: float | None = None,
+) -> float:
+    hours = (
+        estimate_delay_hours_fallback(row)
+        if predicted_delay_hours is None
+        else max(0.0, _to_float(predicted_delay_hours))
+    )
     occ = _to_float(row.get("current_bed_occupancy_percent", 80))
     boarders = _to_int(row.get("ed_boarding_count", 0))
     bottleneck = str(row.get("primary_discharge_bottleneck", "None"))
@@ -173,20 +220,68 @@ def bed_recovery_score(row: pd.Series | dict[str, Any], delay_risk: str, readmis
     return round(score, 1)
 
 
-def build_discharge_queue(df: pd.DataFrame, limit: int | None = None) -> list[dict[str, Any]]:
-    """Build a prioritized multi-patient queue for the command center."""
+def _prediction_map(model_predictions: pd.DataFrame | list[dict[str, Any]] | None) -> dict[str, dict[str, Any]]:
+    if model_predictions is None:
+        return {}
+    if isinstance(model_predictions, pd.DataFrame):
+        records = model_predictions.to_dict(orient="records")
+    else:
+        records = list(model_predictions)
+    return {str(item.get("patient_id", "")): item for item in records if item.get("patient_id") is not None}
+
+
+def _prediction_for_row(
+    row: pd.Series | dict[str, Any],
+    predictions: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    patient_id = str(row.get("patient_id", ""))
+    pred = predictions.get(patient_id)
+    if pred:
+        return {
+            "delay_probability": _to_float(pred.get("discharge_delay_risk_probability"), 0.0),
+            "delay_risk": str(pred.get("delay_risk_level", "Low")),
+            "readmission_probability": _to_float(pred.get("readmission_risk_probability"), 0.0),
+            "readmission_risk": str(pred.get("readmission_risk_level", "Low")),
+            "delay_hours": max(0.0, _to_float(pred.get("predicted_delay_hours"), 0.0)),
+            "prediction_source": str(pred.get("prediction_source", "XGBoost model inference")),
+            "model_version": pred.get("model_version"),
+            "prediction_timestamp_utc": pred.get("prediction_timestamp_utc"),
+        }
+
+    delay_risk = estimate_delay_risk(row)
+    readmission_risk = estimate_readmission_risk(row)
+    return {
+        "delay_probability": RISK_PROBABILITY_FALLBACK[delay_risk],
+        "delay_risk": delay_risk,
+        "readmission_probability": RISK_PROBABILITY_FALLBACK[readmission_risk],
+        "readmission_risk": readmission_risk,
+        "delay_hours": estimate_delay_hours_fallback(row),
+        "prediction_source": "prospective operational fallback",
+        "model_version": None,
+        "prediction_timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
+def build_discharge_queue(
+    df: pd.DataFrame,
+    model_predictions: pd.DataFrame | list[dict[str, Any]] | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """Build a model-scored, prioritized multi-patient discharge queue."""
     if df.empty:
         return []
 
+    predictions = _prediction_map(model_predictions)
     records: list[dict[str, Any]] = []
     for _, row in df.iterrows():
         unit = infer_unit(row)
-        delay_risk = estimate_delay_risk(row)
-        readmission_risk = estimate_readmission_risk(row)
+        scored = _prediction_for_row(row, predictions)
+        delay_risk = scored["delay_risk"]
+        readmission_risk = scored["readmission_risk"]
+        delay_hours = round(scored["delay_hours"], 1)
         bottleneck = str(row.get("primary_discharge_bottleneck", "None"))
         status = estimate_case_status(row, delay_risk, readmission_risk)
-        score = bed_recovery_score(row, delay_risk, readmission_risk)
-        delay_hours = round(_to_float(row.get("expected_discharge_delay_hours", 0)), 1)
+        score = bed_recovery_score(row, delay_risk, readmission_risk, delay_hours)
 
         records.append(
             {
@@ -198,8 +293,14 @@ def build_discharge_queue(df: pd.DataFrame, limit: int | None = None) -> list[di
                 "discharge_destination": str(row.get("discharge_destination", "Unknown")),
                 "delay_risk_level": delay_risk,
                 "delay_risk_display": _risk_badge(delay_risk),
+                "discharge_delay_risk_probability": round(scored["delay_probability"], 4),
+                "delay_probability_display": _percentage(scored["delay_probability"]),
                 "readmission_risk_level": readmission_risk,
                 "readmission_risk_display": _risk_badge(readmission_risk),
+                "readmission_risk_probability": round(scored["readmission_probability"], 4),
+                "readmission_probability_display": _percentage(scored["readmission_probability"]),
+                "predicted_delay_hours": delay_hours,
+                # Backward-compatible alias for older dashboard versions.
                 "predicted_delay_hours_proxy": delay_hours,
                 "primary_bottleneck": bottleneck,
                 "owner_role": bottleneck_owner(bottleneck),
@@ -208,41 +309,54 @@ def build_discharge_queue(df: pd.DataFrame, limit: int | None = None) -> list[di
                 "bed_recovery_score": score,
                 "current_bed_occupancy_percent": _to_int(row.get("current_bed_occupancy_percent", 0)),
                 "ed_boarding_count": _to_int(row.get("ed_boarding_count", 0)),
+                "prediction_source": scored["prediction_source"],
+                "model_version": scored["model_version"],
+                "prediction_timestamp_utc": scored["prediction_timestamp_utc"],
             }
         )
 
     records.sort(key=lambda item: item["bed_recovery_score"], reverse=True)
-    if limit is not None:
-        return records[:limit]
-    return records
+    return records[:limit] if limit is not None else records
 
 
-def build_hospital_capacity_snapshot(df: pd.DataFrame) -> dict[str, Any]:
-    """Create hospital-wide and unit-level capacity KPIs."""
+def build_hospital_capacity_snapshot(
+    df: pd.DataFrame,
+    model_predictions: pd.DataFrame | list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Create a simulated capacity snapshot using model-scored patient risk."""
+    empty_payload = {
+        "snapshot_time_utc": datetime.now(timezone.utc).isoformat(),
+        "total_beds": sum(UNIT_CAPACITY.values()),
+        "occupied_beds": 0,
+        "available_beds": sum(UNIT_CAPACITY.values()),
+        "occupancy_percent": 0,
+        "beds_pending_cleaning": 0,
+        "ed_boarders": 0,
+        "expected_discharges_today": 0,
+        "delayed_discharges": 0,
+        "critical_delay_cases": 0,
+        "units": [],
+        "is_simulated_capacity": True,
+        "data_mode": "Simulated/proxy hospital capacity",
+    }
     if df.empty:
-        return {
-            "snapshot_time_utc": datetime.now(timezone.utc).isoformat(),
-            "total_beds": sum(UNIT_CAPACITY.values()),
-            "occupied_beds": 0,
-            "available_beds": sum(UNIT_CAPACITY.values()),
-            "occupancy_percent": 0,
-            "beds_pending_cleaning": 0,
-            "ed_boarders": 0,
-            "expected_discharges_today": 0,
-            "delayed_discharges": 0,
-            "critical_delay_cases": 0,
-            "units": [],
-        }
+        return empty_payload
 
+    predictions = _prediction_map(model_predictions)
     working = df.copy()
     working["unit"] = working.apply(infer_unit, axis=1)
-    working["delay_risk_level"] = working.apply(estimate_delay_risk, axis=1)
+    scored_rows = working.apply(lambda row: _prediction_for_row(row, predictions), axis=1)
+    working["delay_risk_level"] = [item["delay_risk"] for item in scored_rows]
+    working["predicted_delay_hours"] = [item["delay_hours"] for item in scored_rows]
+    working["prediction_source"] = [item["prediction_source"] for item in scored_rows]
+    working["model_version"] = [item["model_version"] for item in scored_rows]
 
     units: list[dict[str, Any]] = []
-
-    # Emergency Department is displayed as its own pressure row. It is derived
-    # from ED-boarder pressure fields, not from an inpatient ward assignment.
-    ed_boarders = int(round(float(working["ed_boarding_count"].quantile(0.75)))) if "ed_boarding_count" in working else 0
+    ed_boarders = (
+        int(round(float(working["ed_boarding_count"].quantile(0.75))))
+        if "ed_boarding_count" in working
+        else 0
+    )
     ed_occupied = min(UNIT_CAPACITY["Emergency Department"], max(0, 28 + ed_boarders))
     ed_available = max(0, UNIT_CAPACITY["Emergency Department"] - ed_occupied)
     ed_occ = round((ed_occupied / UNIT_CAPACITY["Emergency Department"]) * 100, 1)
@@ -271,8 +385,13 @@ def build_hospital_capacity_snapshot(df: pd.DataFrame) -> dict[str, Any]:
             expected_ready_rate = 0.0
         else:
             occupancy = round(float(group["current_bed_occupancy_percent"].mean()), 1)
-            delayed_rate = float(group["delayed_discharge"].mean()) if "delayed_discharge" in group else 0.0
-            expected_ready_rate = float((group["expected_discharge_delay_hours"] <= 6).mean()) if "expected_discharge_delay_hours" in group else 0.0
+            delayed_rate = float(group["delay_risk_level"].isin(["High", "Critical"]).mean())
+            expected_ready_rate = float(
+                (
+                    (group["predicted_delay_hours"] <= 6)
+                    & group["delay_risk_level"].isin(["Low", "Medium"])
+                ).mean()
+            )
 
         occupied = min(bed_count, max(0, int(round(bed_count * occupancy / 100))))
         available = max(0, bed_count - occupied)
@@ -301,9 +420,11 @@ def build_hospital_capacity_snapshot(df: pd.DataFrame) -> dict[str, Any]:
     delayed_discharges = sum(unit["delayed_discharges"] for unit in units)
     critical_delay_cases = int((working["delay_risk_level"] == "Critical").sum())
     beds_pending_cleaning = max(1, min(12, int(round(expected_discharges * 0.25))))
+    model_versions = [str(v) for v in working["model_version"].dropna().unique().tolist() if str(v)]
+    sources = working["prediction_source"].dropna().unique().tolist()
 
     return {
-        "snapshot_time_utc": datetime.now(timezone.utc).isoformat(),
+        "snapshot_time_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "total_beds": total_beds,
         "occupied_beds": occupied_beds,
         "available_beds": available_beds,
@@ -314,4 +435,8 @@ def build_hospital_capacity_snapshot(df: pd.DataFrame) -> dict[str, Any]:
         "delayed_discharges": delayed_discharges,
         "critical_delay_cases": critical_delay_cases,
         "units": units,
+        "is_simulated_capacity": True,
+        "data_mode": "Simulated/proxy capacity with cached patient-level model scoring",
+        "prediction_source": ", ".join(str(source) for source in sources),
+        "model_version": model_versions[0] if len(model_versions) == 1 else model_versions,
     }

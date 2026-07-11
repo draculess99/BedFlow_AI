@@ -1,7 +1,7 @@
 {
     "status": "trained",
-    "model_version": "bedflow-xgb-20260710T233014Z",
-    "trained_at_utc": "2026-07-10T23:30:14+00:00",
+    "model_version": "bedflow-xgb-20260711T055014Z",
+    "trained_at_utc": "2026-07-11T05:50:14+00:00",
     "model_family": "XGBoost",
     "training_mode": "Hybrid Stage 6 training: BedFlow operational data for delay models; public diabetes hospital data for readmission model.",
     "dataset": {

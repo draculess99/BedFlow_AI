@@ -1,74 +1,67 @@
 # Stage 1 — Hospital Command Center Dashboard
 
-Stage 1 upgrades BedFlow AI from a single-patient demo into a hospital-style operations control tower.
+Stage 1 upgraded BedFlow AI from a single-patient demonstration into a hospital-style operations control tower.
 
-## What changed
-
-The original app flow was:
+## Workflow
 
 ```text
-Select one patient → Evaluate Patient Case → Review AI recommendation → Save human decision
+Simulated capacity snapshot
+        ↓
+Unit bed board
+        ↓
+Model-scored discharge review queue
+        ↓
+Select patient
+        ↓
+Evaluate patient case
 ```
 
-Stage 1 keeps that workflow, but adds a hospital-wide operational layer before the patient-level review:
-
-```text
-Hospital capacity snapshot → Unit bed board → Multi-patient discharge queue → Select patient → Evaluate Patient Case
-```
-
-## New features
+## Current implementation
 
 - Hospital capacity KPI cards.
-- Unit-level bed board.
-- Prioritized discharge queue.
-- Primary blocker, owner role, and next-action columns.
-- Bed-recovery priority score.
+- Simulated unit-level bed board.
+- Prioritized multi-patient discharge review queue.
+- XGBoost delay-risk probability and risk band.
+- XGBoost 30-day readmission probability and risk band.
+- XGBoost expected delay-hours estimate.
+- Primary blocker, owner role, and next action.
+- Composite bed-recovery/review-priority score.
 - Patient selection directly from the queue.
+- Active model version, source, and prediction timestamp.
 
-## New backend file
+## Backend
 
 ```text
 backend/command_center.py
+backend/models.py
+backend/api.py
 ```
 
-This file creates the command-center data without running full model inference for every patient.
-
-## New API endpoints
+## API endpoints
 
 ```text
 GET /api/hospital_capacity
 GET /api/discharge_queue?limit=75
 ```
 
-## Frontend changes
+## Scoring behavior
 
-Updated file:
+The queue now batch-scores the demo patient table using the active saved XGBoost artifacts. The predictions are cached so loading the dashboard does not retrain or repeatedly score every row.
+
+Known target/outcome fields are not used during command-center inference:
 
 ```text
-frontend/dashboard.py
+delayed_discharge
+readmitted_30_days
+expected_discharge_delay_hours
 ```
 
-The Control Tower tab now shows:
+If the model artifacts are unavailable, a conservative operational fallback uses only prospective information such as pending tasks, prior utilization, clinical stability, home support, length of stay, occupancy, and ED boarding pressure.
 
-1. Hospital-wide KPI row.
-2. Unit bed board.
-3. Prioritized discharge queue.
-4. Patient case review panel.
-5. Existing Evaluate Patient Case workflow.
+## Capacity disclaimer
 
-## Important design note
+The unit bed board is simulated/proxy capacity. Unit assignment is inferred from diagnosis and acuity, and capacities are demonstration constants. It is not a live ADT or hospital bed-management feed.
 
-The queue is an operational triage view. It uses existing fields such as:
+## Safety boundary
 
-- `expected_discharge_delay_hours`
-- `primary_discharge_bottleneck`
-- `current_bed_occupancy_percent`
-- `ed_boarding_count`
-- `readmitted_30_days`
-- `prior_admissions_6mo`
-
-It does not train or run XGBoost across every patient when the page loads. Full model prediction still happens on demand when the user clicks **Evaluate Patient Case**.
-
-## Done when
-
-Stage 1 is complete when the app opens into a hospital command-center experience and the user can choose a patient from a prioritized operational queue before running the original AI evaluation.
+The queue ranks patients for authorized review. It never authorizes discharge and must not be treated as a clinical order.

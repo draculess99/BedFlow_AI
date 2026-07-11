@@ -12,6 +12,8 @@ This launches:
 It also generates the synthetic BedFlow dataset if it is missing.
 """
 
+import importlib.util
+import os
 import subprocess
 import sys
 import time
@@ -27,6 +29,9 @@ DATA_GENERATOR = ROOT_DIR / "scripts" / "generate_bedflow_dataset.py"
 
 BACKEND_MODULE = "backend.api"
 DASHBOARD_PATH = ROOT_DIR / "frontend" / "dashboard.py"
+BACKEND_HOST = os.getenv("BEDFLOW_API_HOST", "127.0.0.1")
+BACKEND_PORT = int(os.getenv("BEDFLOW_API_PORT", "5005"))
+DASHBOARD_PORT = int(os.getenv("PORT", os.getenv("BEDFLOW_DASHBOARD_PORT", "8501")))
 
 
 def generate_dataset_if_missing() -> None:
@@ -76,19 +81,36 @@ def generate_readmission_dataset_if_missing() -> None:
 
 
 def start_backend() -> subprocess.Popen:
-    """Start the Flask backend."""
-    print("🚀 Starting Flask backend at http://127.0.0.1:5005 ...")
+    """Start the backend with Waitress when available, otherwise Flask."""
+    print(f"🚀 Starting backend at http://{BACKEND_HOST}:{BACKEND_PORT} ...")
 
-    return subprocess.Popen(
-        [sys.executable, "-m", BACKEND_MODULE],
-        cwd=str(ROOT_DIR),
-    )
+    use_waitress = os.getenv("BEDFLOW_USE_WAITRESS", "true").lower() != "false"
+    if use_waitress and importlib.util.find_spec("waitress") is not None:
+        command = [
+            sys.executable,
+            "-m",
+            "waitress",
+            "--host",
+            BACKEND_HOST,
+            "--port",
+            str(BACKEND_PORT),
+            "backend.api:app",
+        ]
+    else:
+        command = [sys.executable, "-m", BACKEND_MODULE]
+
+    env = os.environ.copy()
+    env["BEDFLOW_API_HOST"] = BACKEND_HOST
+    env["BEDFLOW_API_PORT"] = str(BACKEND_PORT)
+    return subprocess.Popen(command, cwd=str(ROOT_DIR), env=env)
 
 
 def start_frontend() -> subprocess.Popen:
-    """Start the Streamlit dashboard."""
-    print("🚀 Starting Streamlit dashboard at http://localhost:8501 ...")
+    """Start Streamlit on the local or platform-provided public port."""
+    print(f"🚀 Starting Streamlit dashboard at http://localhost:{DASHBOARD_PORT} ...")
 
+    env = os.environ.copy()
+    env.setdefault("BEDFLOW_API_URL", f"http://{BACKEND_HOST}:{BACKEND_PORT}/api")
     return subprocess.Popen(
         [
             sys.executable,
@@ -96,8 +118,11 @@ def start_frontend() -> subprocess.Popen:
             "streamlit",
             "run",
             str(DASHBOARD_PATH),
+            "--server.address=0.0.0.0",
+            f"--server.port={DASHBOARD_PORT}",
         ],
         cwd=str(ROOT_DIR),
+        env=env,
     )
 
 
@@ -142,8 +167,8 @@ def main() -> None:
         frontend_process = start_frontend()
 
         print("\n✅ BedFlow AI is starting.")
-        print("Backend:   http://127.0.0.1:5005")
-        print("Dashboard: http://localhost:8501")
+        print(f"Backend:   http://{BACKEND_HOST}:{BACKEND_PORT}")
+        print(f"Dashboard: http://localhost:{DASHBOARD_PORT}")
         print("\nPress Ctrl+C to stop both services.\n")
 
         while True:

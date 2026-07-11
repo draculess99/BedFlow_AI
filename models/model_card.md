@@ -1,7 +1,7 @@
 # BedFlow AI Model Card
 
-**Model version:** `bedflow-xgb-20260710T233014Z`
-**Trained at UTC:** `2026-07-10T23:30:14+00:00`
+**Model version:** `bedflow-xgb-20260711T055014Z`
+**Trained at UTC:** `2026-07-11T05:50:14+00:00`
 **Model family:** XGBoost classifiers/regressor
 **Stage:** Stage 6 — Public / Realistic Data Upgrade
 

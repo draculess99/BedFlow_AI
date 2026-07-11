@@ -421,9 +421,10 @@ class BedFlowModels:
             },
             "model_card_path": MODEL_CARD_PATH,
             "next_governance_steps": [
-                "Add drift monitoring against future patient-flow data.",
+                "Add authenticated role-based access and backend permission enforcement.",
                 "Add approval workflow for promoting model versions.",
-                "Add FHIR/EHR integration and stronger role-based audit controls.",
+                "Add calibration, drift monitoring, subgroup evaluation, and patient-group validation.",
+                "Move task, audit, prediction, and memory persistence to PostgreSQL for multi-user deployment.",
             ],
         }
 
@@ -574,8 +575,9 @@ class BedFlowModels:
         }
 
         self.is_trained = True
-        metrics["feature_importance"] = self.get_global_feature_importance(top_n=12)
 
+        # Publish/assign the version before building feature-importance metadata so
+        # every metrics section refers to the same active model version.
         if persist_artifacts:
             governance = self._save_model_artifacts(metrics)
         else:
@@ -584,6 +586,7 @@ class BedFlowModels:
             self.training_metadata = governance
             self.loaded_from_artifact = False
 
+        metrics["feature_importance"] = self.get_global_feature_importance(top_n=12)
         metrics["governance"] = governance
 
         # Save latest metrics snapshot. A separate append-only history is also written when artifacts are persisted.
@@ -622,6 +625,7 @@ class BedFlowModels:
         return X.apply(pd.to_numeric, errors="coerce").fillna(0)
 
     def predict_patient(self, patient_data: dict):
+        """Score one patient with the active saved XGBoost model set."""
         if not self.is_trained:
             self.train_models()
 
@@ -637,7 +641,63 @@ class BedFlowModels:
             "readmission_risk_probability": readmit_prob,
             "readmission_risk_level": self.get_risk_level(readmit_prob),
             "predicted_delay_hours": round(hours_pred, 1),
+            "model_version": self.model_version,
+            "prediction_source": "saved XGBoost artifacts" if self.loaded_from_artifact else "in-memory XGBoost models",
+            "prediction_timestamp_utc": self._now_iso(),
         }
+
+    def predict_dataframe(self, patient_df: pd.DataFrame) -> pd.DataFrame:
+        """Batch-score patient rows without retraining the models.
+
+        The command-center queue calls this method once for the complete demo
+        patient table, then caches the output. Target/outcome columns are never
+        supplied to the models because the matrix is reindexed exclusively to
+        the saved feature-column artifact.
+        """
+        if not self.is_trained:
+            self.train_models()
+        if patient_df is None or patient_df.empty:
+            return pd.DataFrame(columns=[
+                "patient_id",
+                "discharge_delay_risk_probability",
+                "delay_risk_level",
+                "readmission_risk_probability",
+                "readmission_risk_level",
+                "predicted_delay_hours",
+                "model_version",
+                "prediction_source",
+                "prediction_timestamp_utc",
+            ])
+
+        working = patient_df.copy()
+        patient_ids = (
+            working["patient_id"].astype(str).tolist()
+            if "patient_id" in working.columns
+            else [str(i) for i in working.index]
+        )
+
+        categorical = [col for col in CATEGORICAL_COLS if col in working.columns]
+        encoded = pd.get_dummies(working, columns=categorical, drop_first=False)
+        X = encoded.reindex(columns=self.feature_columns, fill_value=0)
+        X = X.apply(pd.to_numeric, errors="coerce").fillna(0)
+
+        delay_probs = self.delay_clf.predict_proba(X)[:, 1].astype(float)
+        readmit_probs = self.readmission_clf.predict_proba(X)[:, 1].astype(float)
+        delay_hours = np.maximum(0.0, self.hours_reg.predict(X).astype(float))
+        timestamp = self._now_iso()
+        source = "saved XGBoost artifacts" if self.loaded_from_artifact else "in-memory XGBoost models"
+
+        return pd.DataFrame({
+            "patient_id": patient_ids,
+            "discharge_delay_risk_probability": delay_probs,
+            "delay_risk_level": [self.get_risk_level(float(value)) for value in delay_probs],
+            "readmission_risk_probability": readmit_probs,
+            "readmission_risk_level": [self.get_risk_level(float(value)) for value in readmit_probs],
+            "predicted_delay_hours": np.round(delay_hours, 1),
+            "model_version": self.model_version,
+            "prediction_source": source,
+            "prediction_timestamp_utc": timestamp,
+        })
 
     def _humanize_feature(self, feature: str) -> str:
         for prefix in sorted(CATEGORICAL_COLS, key=len, reverse=True):

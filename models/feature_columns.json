@@ -1,5 +1,5 @@
 {
-    "model_version": "bedflow-xgb-20260710T233014Z",
+    "model_version": "bedflow-xgb-20260711T055014Z",
     "feature_columns": [
         "age",
         "length_of_stay_days",

@@ -1,9 +1,10 @@
+import os
 import streamlit as st
 import pandas as pd
 import requests
 from urllib.parse import urlencode
 
-API_URL = "http://localhost:5005/api"
+API_URL = os.getenv("BEDFLOW_API_URL", "http://127.0.0.1:5005/api").rstrip("/")
 
 st.set_page_config(page_title="BedFlow AI", layout="wide", initial_sidebar_state="expanded")
 
@@ -134,6 +135,23 @@ with st.sidebar:
 
     st.checkbox("Auto-refresh patient queue", value=True)
     st.selectbox("Default Dashboard View", ["Hospital Command Center", "Unit Level", "Patient Level"])
+
+    st.divider()
+    st.markdown("#### Runtime Status")
+    try:
+        health_response = requests.get(f"{API_URL}/health", timeout=2)
+        if health_response.status_code == 200:
+            health_payload = health_response.json()
+            st.success("Backend connected")
+            st.caption(
+                f"Model: {health_payload.get('model_version') or 'not loaded'} · "
+                f"Source: {health_payload.get('model_source', 'unknown')}"
+            )
+        else:
+            st.warning(f"Backend returned HTTP {health_response.status_code}")
+    except requests.RequestException:
+        st.warning("Backend is starting or unavailable")
+    st.caption(f"API: {API_URL}")
 
 
 def api_get(path, default):
@@ -291,7 +309,9 @@ def clear_patient_results_if_changed(selected_id):
 
 def display_capacity_snapshot(capacity):
     st.subheader("🏥 Hospital Command Center Snapshot")
-    st.caption("Stage 1 upgrade: hospital-wide capacity KPIs, unit bed board, and prioritized discharge queue.")
+    st.caption("Simulated/proxy unit capacity enriched with cached patient-level XGBoost risk scores. This is a portfolio demonstration, not a live ADT/bed-management feed.")
+    if capacity.get("model_version"):
+        st.info(f"Queue scoring model: `{capacity.get('model_version')}` · Source: {capacity.get('prediction_source', 'XGBoost inference')}")
 
     k1, k2, k3, k4, k5, k6 = st.columns(6)
     k1.metric("Total Beds", capacity.get("total_beds", 0))
@@ -331,8 +351,8 @@ def display_capacity_snapshot(capacity):
 
 
 def display_discharge_queue(queue):
-    st.markdown("#### Prioritized Discharge Queue")
-    st.caption("This queue is a fast operational triage view. It uses existing BedFlow proxy fields and does not retrain the ML models.")
+    st.markdown("#### Prioritized Discharge Review Queue")
+    st.caption("Each row is batch-scored by the active saved XGBoost artifacts. The queue is cached for speed and does not retrain the models. It prioritizes review; it does not authorize discharge.")
 
     if not queue:
         st.info("No discharge queue records available.")
@@ -344,26 +364,42 @@ def display_discharge_queue(queue):
         "unit",
         "case_status",
         "delay_risk_display",
+        "delay_probability_display",
         "readmission_risk_display",
-        "predicted_delay_hours_proxy",
+        "readmission_probability_display",
+        "predicted_delay_hours",
         "primary_bottleneck",
         "owner_role",
         "next_action",
         "bed_recovery_score",
     ]
+    display_cols = [column for column in display_cols if column in queue_df.columns]
     view_df = queue_df[display_cols].rename(columns={
         "patient_id": "Patient",
         "unit": "Unit",
         "case_status": "Status",
         "delay_risk_display": "Delay Risk",
+        "delay_probability_display": "Delay Prob.",
         "readmission_risk_display": "Readmission Risk",
-        "predicted_delay_hours_proxy": "Delay Hrs",
+        "readmission_probability_display": "Readmit Prob.",
+        "predicted_delay_hours": "Expected Delay Hrs",
         "primary_bottleneck": "Primary Blocker",
         "owner_role": "Owner",
         "next_action": "Next Action",
-        "bed_recovery_score": "Bed Recovery Score",
+        "bed_recovery_score": "Priority Score",
     })
     st.dataframe(view_df.head(30), use_container_width=True, hide_index=True)
+
+    with st.expander("How to read this queue", expanded=False):
+        st.markdown("""
+- **Delay Risk / Probability:** XGBoost estimate that discharge will be delayed.
+- **Readmission Risk / Probability:** XGBoost estimate of 30-day readmission risk.
+- **Expected Delay Hrs:** XGBoost regression estimate of likely delay magnitude.
+- **Primary Blocker / Owner / Next Action:** operational workflow fields from the patient case.
+- **Priority Score:** combines model risk, predicted delay, bed pressure, and blocker severity to rank review order.
+
+A low score means **eligible for routine review**, not automatically approved for discharge.
+""")
 
     queue_options = [
         f"{row['patient_id']} | {row['unit']} | {row['case_status']} | {row['primary_bottleneck']} | score {row['bed_recovery_score']}"
@@ -750,7 +786,7 @@ def display_tasks_and_escalations_tab():
 tabs = st.tabs([
     "Control Tower",
     "Tasks & Escalations",
-    "Model Performance & Governance",
+    "Model Quality & Transparency",
     "Memory & Audit Log",
     "FHIR Interoperability",
     "Data & Limitations"
@@ -978,43 +1014,81 @@ with tabs[0]:
 
                 st.divider()
                 st.subheader("Human-in-the-Loop Review")
+                st.caption("The AI recommends; an identified human reviewer records the final operational decision. This demo does not authenticate users yet.")
+                r1, r2 = st.columns(2)
+                reviewer_name = r1.text_input("Reviewer name", value=st.session_state.get("reviewer_name", "Demo Supervisor"))
+                reviewer_role = r2.selectbox(
+                    "Reviewer role",
+                    ["Bed Manager", "Physician", "Nurse", "Pharmacist", "Case Manager", "Utilization Manager", "Administrator"],
+                )
                 human_dec = st.selectbox("Action", ["Approve", "Override", "Escalate to Case Manager", "Hold"])
-                human_note = st.text_area("Supervisor Note")
+                reason_required = human_dec in {"Override", "Escalate to Case Manager", "Hold"}
+                human_note = st.text_area(
+                    "Decision rationale" + (" (required)" if reason_required else " (optional)"),
+                    help="Override, escalation, and hold decisions require a written reason for the audit trail.",
+                )
 
                 if st.button("Save Decision to Audit Log"):
-                    audit_payload = {
-                        "patient_id": selected_id,
-                        "patient_data": patient_data,
-                        "model_outputs": outs,
-                        "research_outputs": res["research_outputs"],
-                        "committee_recommendation": res["final_recommendation"],
-                        "human_decision": human_dec,
-                        "human_note": human_note,
-                        "memory_insight": res["memory_insight"],
-                        "discharge_checklist": res.get("discharge_checklist") or st.session_state.get("discharge_checklist"),
-                        "task_snapshot": st.session_state.get("patient_tasks", []),
-                        "model_explanations": st.session_state.get("model_explanations")
-                    }
-                    save_res = api_post("/save_human_decision", audit_payload)
-                    if save_res.status_code == 200:
-                        st.success("Decision saved successfully.")
-                        st.session_state.pop("committee_result", None)
-                        st.session_state.pop("model_outputs", None)
-                        st.session_state.pop("discharge_checklist", None)
-                        st.session_state.pop("patient_tasks", None)
-                        st.session_state.pop("model_explanations", None)
-                        st.rerun()
+                    st.session_state["reviewer_name"] = reviewer_name
+                    if not reviewer_name.strip():
+                        st.error("Reviewer name is required.")
+                    elif reason_required and not human_note.strip():
+                        st.error("A written reason is required for override, escalation, or hold decisions.")
                     else:
-                        st.error(f"Save failed: {save_res.text}")
+                        audit_payload = {
+                            "patient_id": selected_id,
+                            "patient_data": patient_data,
+                            "model_outputs": outs,
+                            "research_outputs": res["research_outputs"],
+                            "committee_recommendation": res["final_recommendation"],
+                            "human_decision": human_dec,
+                            "human_note": human_note,
+                            "reviewer_name": reviewer_name,
+                            "reviewer_role": reviewer_role,
+                            "memory_insight": res["memory_insight"],
+                            "discharge_checklist": res.get("discharge_checklist") or st.session_state.get("discharge_checklist"),
+                            "task_snapshot": st.session_state.get("patient_tasks", []),
+                            "model_explanations": st.session_state.get("model_explanations")
+                        }
+                        save_res = api_post("/save_human_decision", audit_payload)
+                        if save_res.status_code == 200:
+                            st.success("Decision saved successfully.")
+                            st.session_state.pop("committee_result", None)
+                            st.session_state.pop("model_outputs", None)
+                            st.session_state.pop("discharge_checklist", None)
+                            st.session_state.pop("patient_tasks", None)
+                            st.session_state.pop("model_explanations", None)
+                            st.rerun()
+                        else:
+                            st.error(f"Save failed: {save_res.text}")
 
 # Tab 2: Tasks & Escalations
 with tabs[1]:
     display_tasks_and_escalations_tab()
 
-# Tab 3: Model Performance & Governance
+# Tab 3: Model Quality & Transparency
 with tabs[2]:
-    st.header("Predictive Models, Baselines, Data Sources & Governance")
-    st.write("Stage 6 upgrades the data story: discharge-delay and delay-hours models train on BedFlow operational data, while the readmission-risk model trains on public hospital readmission data transformed into the BedFlow schema.")
+    st.header("Model Quality, Artifacts & Transparency")
+    st.write("This area explains what the three XGBoost models predict, where the saved artifacts are used, and how the current version was evaluated.")
+
+    model_overview = pd.DataFrame([
+        {"Output": "Discharge delay risk", "Model": "XGBoost classifier", "Meaning": "Probability that discharge will be delayed"},
+        {"Output": "30-day readmission risk", "Model": "XGBoost classifier", "Meaning": "Probability of readmission within 30 days"},
+        {"Output": "Expected delay hours", "Model": "XGBoost regressor", "Meaning": "Estimated magnitude of discharge delay"},
+    ])
+    st.dataframe(model_overview, use_container_width=True, hide_index=True)
+
+    with st.expander("What the saved model artifacts represent", expanded=False):
+        st.markdown("""
+- `models/*.joblib` are the trained XGBoost models loaded for inference.
+- `models/feature_columns.json` preserves the exact input layout expected by the models.
+- `models/model_registry.json` identifies the active published model version and data provenance.
+- `database/model_metrics.json` is the latest evaluation report; it does not make predictions.
+- `database/model_metrics_history.json` tracks evaluation summaries across training runs.
+- `models/model_card.md` documents intended use, limitations, and governance notes.
+""")
+
+    st.info("Operational delay models use synthetic/proxy BedFlow data. The readmission model uses the included public diabetes hospital encounter dataset transformed into the BedFlow feature schema. All outputs remain decision support only.")
 
     b1, b2, b3 = st.columns(3)
     with b1:
@@ -1112,11 +1186,24 @@ with tabs[3]:
         st.subheader("Audit Log")
         logs = api_get("/audit_log", [])
         if logs:
+            audit_rows = []
             for log in reversed(logs):
-                st.write(f"**{log['timestamp']} - {log['patient_id']}**")
-                st.write(f"AI Rec: {log['committee_recommendation']}")
-                st.write(f"Human: {log['human_decision']} ({log['human_note']})")
-                st.divider()
+                audit_rows.append({
+                    "Timestamp UTC": log.get("timestamp_utc") or log.get("timestamp"),
+                    "Patient": log.get("patient_id"),
+                    "Reviewer": log.get("reviewer_name", "Legacy record"),
+                    "Role": log.get("reviewer_role", "Unknown"),
+                    "AI Recommendation": log.get("committee_recommendation"),
+                    "Human Decision": log.get("human_decision"),
+                    "Rationale": log.get("human_note", ""),
+                    "Model Version": log.get("model_version", "Unknown"),
+                })
+            audit_df = pd.DataFrame(audit_rows)
+            role_options = ["All"] + sorted([role for role in audit_df["Role"].dropna().unique().tolist() if role])
+            role_filter = st.selectbox("Filter audit by role", role_options, key="audit_role_filter")
+            if role_filter != "All":
+                audit_df = audit_df[audit_df["Role"] == role_filter]
+            st.dataframe(audit_df, use_container_width=True, hide_index=True)
         else:
             st.write("No audit records yet.")
 
@@ -1189,7 +1276,7 @@ with tabs[5]:
     - The discharge delay and capacity models use **synthetic/proxy operational data**.
     - The readmission risk model trains on **publicly available hospital readmission data** mapped into the BedFlow schema.
     - The AI Committee utilizes a **Retrieval-Augmented Generation (RAG)** pipeline to actively search and cite simulated Hospital Standard Operating Procedures (SOPs) and policies.
-    - The FHIR Interoperability export transforms these cases into **FHIR R4-compliant** resources for external system integration.
+    - The FHIR Interoperability export transforms these cases into **FHIR R4-shaped** resources for external system integration.
     - **No Protected Health Information (PHI)** or real, identifiable patient records are ever used in this system.
 
     **Important Notice & Limitations**:

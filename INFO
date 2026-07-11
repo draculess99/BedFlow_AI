@@ -1,0 +1,11 @@
+BedFlow AI modernization release
+
+Implemented stages: 1-7
+Current increment: model-scored command center, leakage-safe fallback,
+reviewer-attributed audit foundation, modern deployment packaging, and tests.
+
+Run locally:
+    pip install -r requirements.txt
+    python app.py
+
+See README.md and CHANGELOG.md for details.

@@ -9,3 +9,4 @@ groq
 google-generativeai
 python-dotenv
 joblib
+waitress==3.0.2

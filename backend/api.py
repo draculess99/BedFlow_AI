@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 import pandas as pd
 import json
 import os
+import threading
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -30,15 +31,49 @@ from .tasks import (
 
 app = Flask(__name__)
 
+_QUEUE_SCORE_CACHE = {"key": None, "predictions": None}
+_QUEUE_SCORE_LOCK = threading.Lock()
+
+
+def _clear_queue_score_cache() -> None:
+    with _QUEUE_SCORE_LOCK:
+        _QUEUE_SCORE_CACHE["key"] = None
+        _QUEUE_SCORE_CACHE["predictions"] = None
+
+
+def _get_scored_demo_patients(df: pd.DataFrame) -> pd.DataFrame:
+    """Batch-score the demo table once and reuse it across command-center calls."""
+    dataset_mtime = os.stat(DATA_PATH).st_mtime_ns if os.path.exists(DATA_PATH) else 0
+    cache_key = (dataset_mtime, bedflow_models.model_version, len(df))
+    with _QUEUE_SCORE_LOCK:
+        cached = _QUEUE_SCORE_CACHE.get("predictions")
+        if _QUEUE_SCORE_CACHE.get("key") == cache_key and isinstance(cached, pd.DataFrame):
+            return cached.copy()
+
+    predictions = bedflow_models.predict_dataframe(df)
+    with _QUEUE_SCORE_LOCK:
+        _QUEUE_SCORE_CACHE["key"] = cache_key
+        _QUEUE_SCORE_CACHE["predictions"] = predictions.copy()
+    return predictions
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "app": "BedFlow AI"})
+    return jsonify({
+        "status": "ok",
+        "app": "BedFlow AI",
+        "model_loaded": bedflow_models.is_trained,
+        "model_version": bedflow_models.model_version,
+        "model_source": "saved artifact" if bedflow_models.loaded_from_artifact else "in-memory model",
+        "dataset_ready": os.path.exists(DATA_PATH),
+    })
 
 @app.route("/api/train_models", methods=["POST"])
 def train():
     """Train all models and publish versioned model artifacts for Stage 5 governance."""
     try:
         metrics = bedflow_models.train_models(persist_artifacts=True)
+        _clear_queue_score_cache()
         return jsonify({
             "status": "success",
             "metrics": metrics,
@@ -62,6 +97,7 @@ def load_latest_model():
     """Load the latest saved model artifacts into the running backend process."""
     try:
         result = bedflow_models.load_latest_models(silent=False)
+        _clear_queue_score_cache()
         status_code = 200 if result.get("status") == "success" else 404
         return jsonify(result), status_code
     except Exception as e:
@@ -127,15 +163,20 @@ def demo_patients():
 
 @app.route("/api/hospital_capacity", methods=["GET"])
 def hospital_capacity():
-    """Return hospital-wide and unit-level capacity metrics for the command center."""
+    """Return a simulated capacity snapshot enriched by cached XGBoost scores."""
     if not os.path.exists(DATA_PATH):
         return jsonify({"status": "error", "message": "No patient dataset found"}), 404
     df = pd.read_csv(DATA_PATH, keep_default_na=False)
-    return jsonify(build_hospital_capacity_snapshot(df))
+    try:
+        predictions = _get_scored_demo_patients(df)
+    except Exception:
+        predictions = None
+    return jsonify(build_hospital_capacity_snapshot(df, model_predictions=predictions))
+
 
 @app.route("/api/discharge_queue", methods=["GET"])
 def discharge_queue():
-    """Return a prioritized multi-patient discharge queue for operational review."""
+    """Return the model-scored prioritized patient discharge-review queue."""
     if not os.path.exists(DATA_PATH):
         return jsonify([])
     df = pd.read_csv(DATA_PATH, keep_default_na=False)
@@ -146,7 +187,11 @@ def discharge_queue():
             limit = max(1, int(limit_arg))
         except ValueError:
             limit = None
-    return jsonify(build_discharge_queue(df, limit=limit))
+    try:
+        predictions = _get_scored_demo_patients(df)
+    except Exception:
+        predictions = None
+    return jsonify(build_discharge_queue(df, model_predictions=predictions, limit=limit))
 
 
 @app.route("/api/discharge_checklist", methods=["POST"])
@@ -281,7 +326,11 @@ def sync_all_tasks():
     limit = max(1, min(limit, 300))
 
     df = pd.read_csv(DATA_PATH, keep_default_na=False)
-    queue = build_discharge_queue(df, limit=limit)
+    try:
+        predictions = _get_scored_demo_patients(df)
+    except Exception:
+        predictions = None
+    queue = build_discharge_queue(df, model_predictions=predictions, limit=limit)
     records_by_id = {str(row.get("patient_id")): row for row in df.to_dict(orient="records")}
     created = 0
     refreshed = 0
@@ -389,19 +438,32 @@ def memory_state():
 
 @app.route("/api/save_human_decision", methods=["POST"])
 def save_decision():
-    data = request.json
+    data = request.json or {}
+    decision = str(data.get("human_decision", "")).strip()
+    note = str(data.get("human_note", "")).strip()
+    reviewer_name = str(data.get("reviewer_name", "")).strip()
+    reviewer_role = str(data.get("reviewer_role", "")).strip()
+    if not data.get("patient_id") or not decision:
+        return jsonify({"status": "error", "message": "patient_id and human_decision are required"}), 400
+    if not reviewer_name or not reviewer_role:
+        return jsonify({"status": "error", "message": "Reviewer name and role are required for the audit record"}), 400
+    if decision in {"Override", "Escalate to Case Manager", "Hold"} and not note:
+        return jsonify({"status": "error", "message": "A reason is required for override, escalation, or hold decisions"}), 400
     try:
         record = log_human_decision(
             patient_id=data.get("patient_id"),
-            model_outputs=data.get("model_outputs"),
-            research_outputs=data.get("research_outputs"),
+            model_outputs=data.get("model_outputs") or {},
+            research_outputs=data.get("research_outputs") or {},
             committee_rec=data.get("committee_recommendation"),
-            human_decision=data.get("human_decision"),
-            human_note=data.get("human_note"),
+            human_decision=decision,
+            human_note=note,
             memory_insight=data.get("memory_insight"),
             discharge_checklist=data.get("discharge_checklist"),
             task_snapshot=data.get("task_snapshot"),
-            model_explanations=data.get("model_explanations")
+            model_explanations=data.get("model_explanations"),
+            reviewer_name=reviewer_name,
+            reviewer_role=reviewer_role,
+            model_version=(data.get("model_outputs") or {}).get("model_version") or bedflow_models.model_version,
         )
         
         # Append to memory history
@@ -434,4 +496,6 @@ def audit():
     return jsonify(get_audit_log())
 
 if __name__ == "__main__":
-    app.run(port=5005)
+    host = os.getenv("BEDFLOW_API_HOST", "127.0.0.1")
+    port = int(os.getenv("BEDFLOW_API_PORT", "5005"))
+    app.run(host=host, port=port)
