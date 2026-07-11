@@ -146,12 +146,20 @@ with st.sidebar:
     
     # Token Usage Tracker
     st.session_state.setdefault("total_tokens", 0)
-    token_metric_placeholder = st.empty()
-    token_metric_placeholder.metric(
-        label="Total Tokens Used",
-        value=f"{st.session_state['total_tokens']:,}",
-        help="Tracks cumulative token usage when using Groq or Gemini LLM."
-    )
+    col1, col2 = st.columns([2.2, 1])
+    with col1:
+        token_metric_placeholder = st.empty()
+        token_metric_placeholder.metric(
+            label="Total Tokens Used",
+            value=f"{st.session_state['total_tokens']:,}",
+            help="Tracks cumulative token usage when using Groq or Gemini LLM."
+        )
+    with col2:
+        st.write("") # spacing alignment
+        st.write("") 
+        if st.button("🔄 Reset", help="Reset tokens to zero", use_container_width=True):
+            st.session_state["total_tokens"] = 0
+            st.rerun()
     
     st.write("Global system controls & configuration.")
     st.divider()

@@ -33,6 +33,7 @@ The application helps an authorized hospital team answer three practical questio
 
 - [Product overview](#product-overview)
 - [Core capabilities](#core-capabilities)
+- [Application screenshots](#application-screenshots)
 - [System architecture](#system-architecture)
 - [End-to-end workflow](#end-to-end-workflow)
 - [Predictive analytics](#predictive-analytics)
@@ -95,6 +96,24 @@ BedFlow AI brings those signals into one operational workflow:
 | **Persistent JSON storage** | Configurable runtime directory for users, tasks, audit, memory, and simulations; compatible with a Railway `/data` volume |
 | **System operations** | Liveness, readiness, version, request IDs, latency, structured logs, security headers, and administrator metrics |
 | **Delivery tooling** | Docker, Railway configuration, GitHub Actions, secret scanning, smoke checks, and clean packaging |
+
+---
+
+## Application screenshots
+
+*(Add your screenshots to the `docs/images/` directory. Once they are there, they will automatically appear below!)*
+
+| Hospital Command Center | Patient Case Review |
+|:---:|:---:|
+| ![Command Center](docs/images/control_tower_dashboard.png) | ![Patient Review](docs/images/patient_case_review.png) |
+
+| Multi-Agent Committee Debate | Task & Escalation Workflow |
+|:---:|:---:|
+| ![Agent Debate](docs/images/ai_committee_debate.png) | ![Tasks](docs/images/task_escalation_workflow.png) |
+
+| Capacity Simulator | FHIR Interoperability |
+|:---:|:---:|
+| ![Simulator](docs/images/capacity_simulator.png) | ![FHIR](docs/images/fhir_interoperability.png) |
 
 ---
 
