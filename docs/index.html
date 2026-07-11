@@ -13,10 +13,17 @@
       mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: { primaryColor: '#f8f9fa', primaryBorderColor: '#dadce0', primaryTextColor: '#202124', lineColor: '#4285F4', fontFamily: 'Roboto' }});
     </script>
     <style>
-        /* Mermaid overrides for visibility */
+        /* Mermaid overrides for visibility and size */
         .mermaid .node text, .mermaid .cluster text, .mermaid .edgeLabel text {
             font-size: 16px !important;
             font-weight: 700 !important;
+        }
+        .mermaid svg {
+            width: 100% !important;
+            max-width: none !important;
+            height: auto !important;
+            transform: scale(1.1);
+            transform-origin: top center;
         }
         
         :root {
