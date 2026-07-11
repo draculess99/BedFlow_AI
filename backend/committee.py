@@ -138,7 +138,8 @@ Do not include markdown blocks or any other text outside the JSON.
         res_json, tok = call_llm(prompt, decision_system, model_name, is_json=True)
         return json.loads(res_json), tok, None
     except Exception as e:
-        return {}, 0, str(e)
+        import traceback
+        return {}, 0, f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
 
 
 def run_committee(patient_data, model_outputs, decision_system="Internal Expert System", model_name=None):
