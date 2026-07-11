@@ -1,5 +1,49 @@
 # Changelog
 
+## 2026-07-11 — Stage 10A Production Readiness and Observability
+
+### Added
+
+- Structured JSON request logging with route, status, latency, request ID, user, and role context.
+- Request ID, response-time, no-sniff, frame, referrer, browser-permission, and sensitive-cache headers.
+- `/api/ready`, `/api/system/version`, and administrator-protected `/api/metrics` endpoints.
+- System Operations dashboard tab with readiness checks and request diagnostics.
+- GitHub Actions CI for secret scanning, compilation, 20 automated tests, smoke checks, and clean packaging.
+- Secret-scanning and release-packaging scripts.
+- Docker and Railway health-check improvements.
+- Stage 10A documentation and six new tests.
+
+### Changed
+
+- `/api/health` is now a lightweight liveness endpoint with app version and Stage 10A status.
+- README and roadmap now separate Stage 10A completion from Stage 10B persistence and Stage 10C model validation.
+
+### Remaining limitation
+
+- Runtime tasks, audit records, memory, identities, access events, and simulations still use local JSON persistence. PostgreSQL is the next planned increment.
+
+## 2026-07-11 — Stage 9 Capacity What-If Simulator
+
+### Added
+
+- Counterfactual operational simulation using the active saved XGBoost artifacts without retraining.
+- Pharmacy, insurance, transport, home-care, social-work, Rehab/SNF, case-manager, cleaning-bed, and temporary-bed levers.
+- Potential bed recovery, delay-hours removed, High/Critical-case reduction, operational-blocker reduction, and ED boarding-relief estimates.
+- Unit-level and patient-level scenario impact tables.
+- Signed-user attribution, saved scenario history, and CSV export.
+- Stage 9 API endpoints, Streamlit tab, documentation, smoke coverage, and four new automated tests.
+
+### Safety and governance
+
+- Clinical stability, vital-sign stability, and physician sign-off are never automatically cleared by a scenario.
+- Scenario outputs are labeled counterfactual synthetic/proxy estimates rather than causal forecasts.
+- Bed Manager/Administrator permissions are required to run or save scenarios.
+
+### Fixed
+
+- Patient-task synchronization now requires the `task.sync` permission in both the API and dashboard.
+- Model data preparation and artifact-management controls are now permission-aware in the UI and API.
+
 ## 2026-07-11 — Model-Scored Command Center & Modernization
 
 ### Added

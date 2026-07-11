@@ -132,34 +132,75 @@ Production hardening still required outside the portfolio stage:
 - database-backed identities and sessions;
 - centralized immutable audit storage.
 
-## Stage 9 — Capacity What-If Simulator ⏳
+## Stage 9 — Capacity What-If Simulator ✅
 
-Recommended features:
+Implemented:
 
-- simulate clearing pharmacy blockers;
-- increase transport capacity;
-- add case-management availability;
-- resolve insurance or placement backlogs;
-- compare current and simulated beds recovered;
-- estimate delay-hours removed;
-- estimate ED boarding relief;
-- save simulation scenarios.
+- authenticated Bed Manager/Administrator scenario execution;
+- pharmacy, insurance, transport, home-care, and social-work clearance levers;
+- Rehab/SNF placement clearance counts;
+- additional case-manager availability;
+- cleaning-bed release and temporary staffed-bed capacity;
+- unit scope and planning horizon;
+- current-versus-counterfactual XGBoost inference without retraining;
+- potential review candidates, workflow bed recovery, delay-hours removed, and ED boarding relief;
+- unit and patient impact tables;
+- protected clinical stability and physician-signoff fields;
+- identity-bound saved scenarios and CSV export;
+- Stage 9 API, dashboard tab, documentation, smoke checks, and tests.
 
-## Stage 10 — Portfolio and Production Polish ⏳
+The output is a synthetic/proxy counterfactual estimate, not causal proof, a live ADT forecast, or discharge authorization.
 
-Recommended features:
+## Stage 10A — Production Readiness and Observability ✅
 
-- screenshots and demo video;
-- GitHub Pages landing page;
-- CI workflow;
-- PostgreSQL persistence;
-- structured logging and monitoring;
-- model calibration and threshold analysis;
-- patient-group validation split;
-- subgroup/fairness evaluation;
+Implemented:
+
+- structured JSON request logging;
+- request IDs and response-time headers;
+- security headers on API responses;
+- separate liveness, deep readiness, version, and administrator metrics endpoints;
+- System Operations dashboard tab;
+- GitHub Actions CI for secret scanning, compilation, tests, smoke checks, and release packaging;
+- clean packaging scripts that exclude `.env`, Git history, password hashes, logs, and caches;
+- Stage 10A documentation and six additional automated tests.
+
+Important limitation:
+
+- request metrics are process-local and reset on restart;
+- the current JSON stores are still single-user demonstration persistence.
+
+## Stage 10B — Transactional Persistence ⏳
+
+Recommended next implementation:
+
+- PostgreSQL-backed users, tasks, task events, audit records, memory, access events, and simulations;
+- schema migrations and transaction boundaries;
+- uniqueness and foreign-key constraints;
+- JSON-to-database migration tooling;
+- database readiness, backup, restore, retention, and concurrency tests.
+
+## Stage 10C — Model Validation and Explainability ⏳
+
+Remaining analytical hardening:
+
+- patient-group train/test splitting for readmission data;
+- probability calibration and precision-recall AUC;
+- threshold and uncertainty analysis;
+- subgroup evaluation and documented fairness limitations;
 - formal SHAP explanations;
-- SMART on FHIR and OAuth only for real integration.
+- data-quality and model-drift monitoring.
+
+## Portfolio Finish ⏳
+
+Remaining presentation work:
+
+- screenshots and short demonstration video;
+- GitHub Pages landing page;
+- static architecture images as Mermaid fallbacks;
+- recruiter-facing project summary.
+
+Enterprise SSO/OIDC, MFA, HTTPS, and SMART on FHIR should only be added for a genuine multi-user or hospital integration.
 
 ## Recommended next implementation
 
-Build the **Stage 9 capacity what-if simulator** next. Stage 8 now supplies the authenticated identity and permission layer needed to attribute saved simulations and operational actions.
+Build **Stage 10B transactional PostgreSQL persistence** next. The app now has CI, request tracing, readiness checks, and operational diagnostics; the largest remaining engineering weakness is concurrent-safe durable storage.

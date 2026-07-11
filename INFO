@@ -1,11 +1,17 @@
-BedFlow AI modernization release
+BedFlow AI Stage 10A release
 
-Implemented stages: 1-7
-Current increment: model-scored command center, leakage-safe fallback,
-reviewer-attributed audit foundation, modern deployment packaging, and tests.
+Implemented stages: 1-9 plus Stage 10A
+Current increment: structured request logging, request IDs, response timing,
+security headers, liveness/readiness/version/metrics endpoints, System
+Operations dashboard, GitHub Actions CI, secret scanning, clean packaging,
+updated documentation, and 20 passing automated tests.
 
 Run locally:
     pip install -r requirements.txt
     python app.py
 
-See README.md and CHANGELOG.md for details.
+Next engineering increment:
+    Stage 10B transactional PostgreSQL persistence.
+
+See README.md, UPGRADE_SUMMARY.md, CHANGELOG.md, and
+ docs/STAGE_10A_PRODUCTION_READINESS_OBSERVABILITY.md.

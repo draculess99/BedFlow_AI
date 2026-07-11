@@ -246,9 +246,24 @@ with st.sidebar:
             health_payload = health_response.json()
             st.success("Backend connected")
             st.caption(
+                f"Version: {health_payload.get('app_version', 'unknown')} · "
+                f"Stage: {health_payload.get('upgrade_stage', 'unknown')}"
+            )
+            st.caption(
                 f"Model: {health_payload.get('model_version') or 'not loaded'} · "
                 f"Source: {health_payload.get('model_source', 'unknown')}"
             )
+            try:
+                ready_response = requests.get(f"{API_URL}/ready", timeout=3)
+                ready_payload = ready_response.json()
+                if ready_payload.get("status") == "ready":
+                    st.success("Deployment readiness: ready")
+                elif ready_payload.get("ready"):
+                    st.warning("Deployment readiness: degraded")
+                else:
+                    st.error("Deployment readiness: not ready")
+            except requests.RequestException:
+                st.warning("Readiness probe unavailable")
         else:
             st.warning(f"Backend returned HTTP {health_response.status_code}")
     except requests.RequestException:
@@ -388,6 +403,41 @@ def download_audit_csv():
 
 def load_access_log():
     return api_get("/access_log", [])
+
+
+def load_readiness():
+    return api_get("/ready", {})
+
+
+def load_system_version():
+    return api_get("/system/version", {})
+
+
+def load_operational_metrics():
+    return api_get("/metrics", {})
+
+
+def load_simulation_capability():
+    return api_get("/simulations/capability", {})
+
+
+def run_capacity_scenario(scenario, save=False):
+    return api_post("/simulations/run", {"scenario": scenario, "save": save})
+
+
+def load_simulation_history(limit=100, actor_role=None):
+    params = {"limit": limit}
+    if actor_role and actor_role != "All":
+        params["actor_role"] = actor_role
+    return api_get(f"/simulations?{urlencode(params)}", [])
+
+
+def download_simulation_csv():
+    return requests.get(
+        f"{API_URL}/simulations/export.csv",
+        headers=auth_headers(),
+        timeout=30,
+    )
 
 
 def sync_patient_tasks(patient_data, checklist):
@@ -911,14 +961,336 @@ def display_tasks_and_escalations_tab():
         st.markdown("#### 🚨 Overdue Tasks")
         st.dataframe(_task_dataframe(overdue), use_container_width=True, hide_index=True)
 
+
+def _simulation_history_rows(runs):
+    rows = []
+    for run in runs:
+        scenario = run.get("scenario") or {}
+        actor = run.get("actor") or {}
+        summary = run.get("summary") or {}
+        rows.append({
+            "Simulation": run.get("simulation_id"),
+            "Created UTC": run.get("created_at_utc"),
+            "Scenario": scenario.get("scenario_name"),
+            "Scope": scenario.get("scope_unit"),
+            "Reviewer": actor.get("display_name"),
+            "Role": actor.get("role"),
+            "Changed Patients": summary.get("patients_changed", 0),
+            "Improved Patients": summary.get("patients_improved", 0),
+            "Potential Beds": summary.get("potential_beds_recovered_from_workflow", 0),
+            "Additional Capacity": summary.get("additional_potential_capacity", 0),
+            "Delay Hours Removed": summary.get("delay_hours_removed", 0),
+            "Potential ED Relief": summary.get("potential_ed_boarder_reduction", 0),
+        })
+    return rows
+
+
+def display_capacity_simulator_tab():
+    st.header("Capacity What-If Simulator")
+    st.write(
+        "Stage 9 changes selected operational blocker inputs, re-scores the same "
+        "synthetic/proxy patient cohort with the active XGBoost artifacts, and compares "
+        "the current and simulated capacity picture."
+    )
+    st.warning(
+        "This is counterfactual decision support—not causal proof, a live hospital forecast, "
+        "or permission to discharge patients. Clinical stability and physician sign-off are never auto-cleared."
+    )
+
+    capability = load_simulation_capability()
+    supported_units = capability.get("supported_units", ["All Units"])
+    if capability:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Upgrade Stage", capability.get("stage", 9))
+        c2.metric("Operational Levers", len(capability.get("operational_levers", [])))
+        c3.metric("Protected Safety Fields", len(capability.get("protected_safety_fields", [])))
+
+    user = current_user()
+    can_run = has_permission("simulation.run")
+    if not user:
+        st.info("Sign in as a Bed Manager or Administrator to run and save scenarios.")
+    elif can_run:
+        st.success(
+            f"Scenario will be attributed to {user.get('display_name')} ({user.get('role')})."
+        )
+    else:
+        st.info(
+            f"{user.get('role')} may view saved scenario results but cannot run new capacity simulations."
+        )
+
+    with st.expander("Configure operational scenario", expanded=True):
+        top1, top2, top3 = st.columns(3)
+        scenario_name = top1.text_input(
+            "Scenario name",
+            value="Clear priority discharge blockers",
+            key="sim_scenario_name",
+        )
+        scope_unit = top2.selectbox(
+            "Unit scope",
+            supported_units,
+            key="sim_scope_unit",
+        )
+        horizon_hours = top3.selectbox(
+            "Planning horizon",
+            [6, 12, 24, 36, 48, 72],
+            index=2,
+            format_func=lambda value: f"{value} hours",
+            key="sim_horizon",
+        )
+
+        st.markdown("##### Operational blocker clearance")
+        l1, l2 = st.columns(2)
+        pharmacy_pct = l1.slider(
+            "Pharmacy MedRec cleared",
+            0,
+            100,
+            50,
+            step=10,
+            format="%d%%",
+            key="sim_pharmacy",
+        )
+        insurance_pct = l1.slider(
+            "Insurance authorizations cleared",
+            0,
+            100,
+            40,
+            step=10,
+            format="%d%%",
+            key="sim_insurance",
+        )
+        transport_pct = l1.slider(
+            "Transport blockers cleared",
+            0,
+            100,
+            50,
+            step=10,
+            format="%d%%",
+            key="sim_transport",
+        )
+        home_care_pct = l2.slider(
+            "Home-care setup cleared",
+            0,
+            100,
+            40,
+            step=10,
+            format="%d%%",
+            key="sim_homecare",
+        )
+        social_work_pct = l2.slider(
+            "Social-work reviews cleared",
+            0,
+            100,
+            25,
+            step=5,
+            format="%d%%",
+            key="sim_socialwork",
+        )
+        rehab_cleared = l2.number_input(
+            "Rehab/SNF placements cleared",
+            min_value=0,
+            max_value=100,
+            value=5,
+            step=1,
+            key="sim_rehab",
+        )
+
+        st.markdown("##### Staffing and physical capacity")
+        r1, r2, r3, r4 = st.columns(4)
+        extra_case_managers = r1.number_input(
+            "Additional case managers",
+            min_value=0,
+            max_value=20,
+            value=1,
+            step=1,
+            key="sim_case_managers",
+        )
+        cleaning_released = r2.number_input(
+            "Beds released from cleaning",
+            min_value=0,
+            max_value=50,
+            value=2,
+            step=1,
+            key="sim_cleaning",
+        )
+        temporary_beds = r3.number_input(
+            "Temporary staffed beds",
+            min_value=0,
+            max_value=50,
+            value=0,
+            step=1,
+            key="sim_temp_beds",
+        )
+        save_scenario = r4.checkbox(
+            "Save scenario",
+            value=True,
+            disabled=not has_permission("simulation.save"),
+            key="sim_save",
+        )
+
+        scenario = {
+            "scenario_name": scenario_name,
+            "scope_unit": scope_unit,
+            "horizon_hours": horizon_hours,
+            "pharmacy_clearance_percent": pharmacy_pct,
+            "insurance_clearance_percent": insurance_pct,
+            "transport_clearance_percent": transport_pct,
+            "home_care_clearance_percent": home_care_pct,
+            "social_work_clearance_percent": social_work_pct,
+            "rehab_placements_cleared": int(rehab_cleared),
+            "additional_case_managers": int(extra_case_managers),
+            "cleaning_beds_released": int(cleaning_released),
+            "temporary_beds_opened": int(temporary_beds),
+        }
+
+        if st.button(
+            "Run Capacity Scenario",
+            type="primary",
+            use_container_width=True,
+            disabled=not can_run,
+            help="Bed Manager or Administrator permission is required.",
+            key="run_capacity_simulation",
+        ):
+            with st.spinner("Re-scoring current and counterfactual patient cohorts..."):
+                response = run_capacity_scenario(scenario, save=save_scenario)
+                if response.status_code == 200:
+                    st.session_state["capacity_simulation_result"] = response.json()
+                    st.success("Scenario completed" + (" and saved." if save_scenario else "."))
+                else:
+                    st.error(f"Simulation failed: {response.text}")
+
+    result = st.session_state.get("capacity_simulation_result")
+    if result:
+        summary = result.get("summary") or {}
+        st.divider()
+        st.subheader("Scenario Impact")
+        m1, m2, m3, m4, m5, m6 = st.columns(6)
+        m1.metric(
+            "Potential Open Beds",
+            summary.get("potential_open_beds", 0),
+            summary.get("additional_potential_capacity", 0),
+        )
+        m2.metric(
+            "Workflow Bed Candidates",
+            summary.get("potential_beds_recovered_from_workflow", 0),
+        )
+        m3.metric("Delay Hours Removed", summary.get("delay_hours_removed", 0))
+        m4.metric("Patients Improved", summary.get("patients_improved", 0))
+        m5.metric(
+            "High/Critical Reduced",
+            summary.get("high_or_critical_cases_reduced", 0),
+        )
+        m6.metric(
+            "Potential ED Relief",
+            summary.get("potential_ed_boarder_reduction", 0),
+        )
+
+        before_after = pd.DataFrame([
+            {
+                "Measure": "Potential expedited-review candidates",
+                "Current": summary.get("current_review_candidates", 0),
+                "Simulated": summary.get("simulated_review_candidates", 0),
+            },
+            {
+                "Measure": "High/Critical delay cases",
+                "Current": summary.get("current_high_or_critical_delay_cases", 0),
+                "Simulated": summary.get("simulated_high_or_critical_delay_cases", 0),
+            },
+            {
+                "Measure": "Operational blockers",
+                "Current": summary.get("current_operational_blockers", 0),
+                "Simulated": summary.get("simulated_operational_blockers", 0),
+            },
+            {
+                "Measure": "Open beds / potential open beds",
+                "Current": summary.get("current_open_beds", 0),
+                "Simulated": summary.get("potential_open_beds", 0),
+            },
+            {
+                "Measure": "ED boarders / potential remaining",
+                "Current": summary.get("current_ed_boarders", 0),
+                "Simulated": max(
+                    0,
+                    summary.get("current_ed_boarders", 0)
+                    - summary.get("potential_ed_boarder_reduction", 0),
+                ),
+            },
+        ])
+        st.dataframe(before_after, use_container_width=True, hide_index=True)
+
+        b1, b2 = st.columns(2)
+        with b1:
+            st.markdown("#### Blocker Comparison")
+            st.dataframe(
+                pd.DataFrame(result.get("blocker_comparison", [])),
+                use_container_width=True,
+                hide_index=True,
+            )
+        with b2:
+            st.markdown("#### Unit Impact")
+            st.dataframe(
+                pd.DataFrame(result.get("unit_impacts", [])),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        patient_impacts = result.get("top_patient_impacts", [])
+        if patient_impacts:
+            st.markdown("#### Highest-Impact Patient Cases")
+            impact_df = pd.DataFrame(patient_impacts)
+            if "changes" in impact_df.columns:
+                impact_df["changes"] = impact_df["changes"].apply(
+                    lambda values: "; ".join(values) if isinstance(values, list) else values
+                )
+            st.dataframe(impact_df, use_container_width=True, hide_index=True)
+
+        with st.expander("Scenario actions and assumptions", expanded=False):
+            st.markdown("##### Applied action counts")
+            action_rows = []
+            for action, details in (result.get("applied_actions") or {}).items():
+                action_rows.append({
+                    "Action": action.replace("_", " ").title(),
+                    "Eligible": details.get("eligible", 0),
+                    "Changed": details.get("changed", 0),
+                })
+            st.dataframe(pd.DataFrame(action_rows), use_container_width=True, hide_index=True)
+            st.markdown("##### Assumptions")
+            for assumption in result.get("assumptions", []):
+                st.write(f"- {assumption}")
+
+    st.divider()
+    st.subheader("Saved Scenario History")
+    if not has_permission("simulation.read"):
+        st.info("A simulation-enabled authenticated role is required to view saved scenarios.")
+    else:
+        history = load_simulation_history(limit=100)
+        if history:
+            history_df = pd.DataFrame(_simulation_history_rows(history))
+            st.dataframe(history_df, use_container_width=True, hide_index=True)
+            if has_permission("simulation.export"):
+                export_response = download_simulation_csv()
+                if export_response.status_code == 200:
+                    st.download_button(
+                        "Download Scenario History CSV",
+                        data=export_response.content,
+                        file_name="bedflow_simulation_runs.csv",
+                        mime="text/csv",
+                    )
+                else:
+                    st.error(f"Scenario export failed: {export_response.text}")
+        else:
+            st.caption("No saved scenarios yet.")
+
+
 # Tabs
 tabs = st.tabs([
     "Control Tower",
     "Tasks & Escalations",
+    "Capacity Simulator",
     "Model Quality & Transparency",
     "Memory & Audit Log",
     "FHIR Interoperability",
-    "Data & Limitations"
+    "Data & Limitations",
+    "System Operations",
 ])
 
 # Tab 1: Control Tower (Main Workflow)
@@ -1096,7 +1468,7 @@ with tabs[0]:
                 st.divider()
                 display_discharge_readiness_checklist(checklist_preview)
 
-                if current_user():
+                if has_permission("task.sync"):
                     task_bundle = sync_patient_tasks(patient_data, checklist_preview)
                 else:
                     existing_tasks = load_tasks(patient_id=selected_id)
@@ -1212,8 +1584,12 @@ with tabs[0]:
 with tabs[1]:
     display_tasks_and_escalations_tab()
 
-# Tab 3: Model Quality & Transparency
+# Tab 3: Capacity What-If Simulator
 with tabs[2]:
+    display_capacity_simulator_tab()
+
+# Tab 4: Model Quality & Transparency
+with tabs[3]:
     st.header("Model Quality, Artifacts & Transparency")
     st.write("This area explains what the three XGBoost models predict, where the saved artifacts are used, and how the current version was evaluated.")
 
@@ -1238,7 +1614,13 @@ with tabs[2]:
 
     b1, b2, b3 = st.columns(3)
     with b1:
-        if st.button("Train & Publish Versioned Models", type="primary", use_container_width=True):
+        if st.button(
+            "Train & Publish Versioned Models",
+            type="primary",
+            use_container_width=True,
+            disabled=not has_permission("model.train"),
+            help="Administrator permission is required.",
+        ):
             with st.spinner("Training models and publishing artifacts..."):
                 train_res = api_post("/train_models")
                 if train_res.status_code == 200:
@@ -1248,7 +1630,12 @@ with tabs[2]:
                 else:
                     st.error(f"Training failed: {train_res.text}")
     with b2:
-        if st.button("Prepare Public Readmission Data", use_container_width=True):
+        if st.button(
+            "Prepare Public Readmission Data",
+            use_container_width=True,
+            disabled=not has_permission("model.manage"),
+            help="Administrator permission is required.",
+        ):
             with st.spinner("Preparing public readmission training layer..."):
                 prep_res = prepare_public_readmission_data(force=False)
                 if prep_res.status_code == 200:
@@ -1258,7 +1645,12 @@ with tabs[2]:
                     st.error(f"Preparation failed: {prep_res.text}")
 
     with b3:
-        if st.button("Load Latest Saved Artifacts", use_container_width=True):
+        if st.button(
+            "Load Latest Saved Artifacts",
+            use_container_width=True,
+            disabled=not has_permission("model.manage"),
+            help="Administrator permission is required.",
+        ):
             with st.spinner("Loading saved model artifacts into backend memory..."):
                 load_res = load_latest_model_artifacts()
                 if load_res.status_code == 200:
@@ -1316,8 +1708,8 @@ with tabs[2]:
     else:
         st.write("No metrics available. Train and publish models first.")
 
-# Tab 4: Memory & Audit Log
-with tabs[3]:
+# Tab 5: Memory & Audit Log
+with tabs[4]:
     st.header("Authenticated Audit, Task Events & System Memory")
     col1, col2 = st.columns(2)
     with col1:
@@ -1402,8 +1794,8 @@ with tabs[3]:
             else:
                 st.caption("No access events recorded yet.")
 
-# Tab 5: FHIR Interoperability
-with tabs[4]:
+# Tab 6: FHIR Interoperability
+with tabs[5]:
     st.header("FHIR-Style Interoperability Export")
     st.write("Stage 7 maps a selected BedFlow case into de-identified FHIR R4-shaped Patient, Encounter, Observation, Task, CarePlan, Location, and Bundle resources. This is an export adapter for demonstration—not a certified FHIR server.")
     capability = api_get("/fhir/capability", {})
@@ -1463,8 +1855,8 @@ with tabs[4]:
             with st.expander("Preview FHIR Bundle", expanded=False):
                 st.json(st.session_state["fhir_bundle"])
 
-# Tab 6: Limitations
-with tabs[5]:
+# Tab 7: Limitations
+with tabs[6]:
     st.header("Data Sources and Limitations")
     st.write("""
     **Data Sources & Capabilities**:
@@ -1480,3 +1872,78 @@ with tabs[5]:
     - The Multi-Agent AI committee (Patient Safety Advocate, Operations Manager, Clinical Director) provides **decision support only**.
     - The system **does not automatically discharge patients**. Human review and sign-off are strictly required before any action is taken.
     """)
+
+# Tab 8: Stage 10A System Operations
+with tabs[7]:
+    st.header("Stage 10A — System Operations & Readiness")
+    st.caption(
+        "Lightweight production diagnostics for the portfolio deployment: liveness, "
+        "deep readiness checks, request IDs, timing, structured logs, and in-process metrics."
+    )
+
+    version_payload = load_system_version()
+    readiness_payload = load_readiness()
+
+    if version_payload:
+        v1, v2, v3 = st.columns(3)
+        v1.metric("Application Version", version_payload.get("app_version", "Unknown"))
+        v2.metric("Upgrade Stage", version_payload.get("upgrade_stage", "Unknown"))
+        completed = version_payload.get("completed_stages", [])
+        v3.metric("Completed Increments", len(completed))
+
+    if readiness_payload:
+        status = readiness_payload.get("status", "unknown")
+        if status == "ready":
+            st.success("The API is ready to serve the demonstration workload.")
+        elif readiness_payload.get("ready"):
+            st.warning("The API can run, but production-readiness warnings remain.")
+        else:
+            st.error("One or more critical readiness checks failed.")
+
+        summary = readiness_payload.get("summary", {})
+        r1, r2, r3 = st.columns(3)
+        r1.metric("Checks Passed", summary.get("passed", 0))
+        r2.metric("Warnings", summary.get("warnings", 0))
+        r3.metric("Critical Failures", summary.get("failed", 0))
+
+        checks = readiness_payload.get("checks", [])
+        if checks:
+            st.dataframe(pd.DataFrame(checks), use_container_width=True, hide_index=True)
+    else:
+        st.warning("Readiness information is unavailable.")
+
+    st.divider()
+    st.subheader("Request Metrics")
+    if has_permission("access.read"):
+        metrics_payload = load_operational_metrics()
+        if metrics_payload:
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Requests", metrics_payload.get("total_requests", 0))
+            m2.metric("Server Errors", metrics_payload.get("total_server_errors", 0))
+            m3.metric("Average Latency", f"{metrics_payload.get('average_latency_ms', 0)} ms")
+            m4.metric("Maximum Latency", f"{metrics_payload.get('max_latency_ms', 0)} ms")
+
+            st.markdown("#### HTTP Status Counts")
+            st.json(metrics_payload.get("status_counts", {}))
+            st.markdown("#### Most-used API Endpoints")
+            endpoint_counts = metrics_payload.get("endpoint_counts", {})
+            if endpoint_counts:
+                endpoint_df = pd.DataFrame(
+                    [{"endpoint": key, "requests": value} for key, value in endpoint_counts.items()]
+                )
+                st.dataframe(endpoint_df, use_container_width=True, hide_index=True)
+            if metrics_payload.get("last_error"):
+                st.markdown("#### Most Recent Server Error")
+                st.json(metrics_payload.get("last_error"))
+            st.caption(metrics_payload.get("metrics_scope", ""))
+        else:
+            st.info("No request metrics are available yet.")
+    else:
+        st.info("Administrator access is required to view operational request metrics.")
+
+    st.info(
+        "Stage 10A observability is a deployment baseline. The next production increment is "
+        "transactional PostgreSQL persistence; the current JSON stores remain suitable only "
+        "for a local or single-user demonstration."
+    )
+

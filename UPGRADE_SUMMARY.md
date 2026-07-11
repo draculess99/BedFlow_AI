@@ -2,46 +2,53 @@
 
 ## Implemented in this package
 
-This package completes **Stage 8 — Authenticated Role-Based Workflow**.
+This package completes **Stage 10A — Production Readiness and Observability** while preserving Stages 1–9.
 
 Key additions:
 
-- signed local demo authentication;
-- nine operational roles;
-- backend-enforced permissions;
-- role-owned task updates;
-- immutable task event history;
-- identity-bound human decisions;
-- role-specific allowed decisions;
-- administrator audit CSV export;
-- administrator access-event viewer;
-- updated README, roadmap, environment settings, and tests.
+- structured JSON API request logs;
+- request IDs and response-time headers;
+- security headers and no-store handling for sensitive API responses;
+- liveness, deep readiness, version, and administrator metrics endpoints;
+- a new System Operations dashboard tab;
+- GitHub Actions CI;
+- secret scanning, compilation, 20 automated tests, smoke checks, and clean release packaging;
+- Docker and Railway health-check improvements;
+- updated README, roadmap, changelog, environment template, and Stage 10A documentation.
 
-## Local demo login
-
-Default password:
+## New operational endpoints
 
 ```text
-BedFlowDemo!
+GET /api/health
+GET /api/ready
+GET /api/system/version
+GET /api/metrics        # Administrator only
 ```
 
-Override before first startup:
+## Local validation
 
 ```text
-BEDFLOW_DEMO_PASSWORD=<new-password>
-BEDFLOW_AUTH_SECRET=<long-random-secret>
+20 automated tests passed
+Full backend smoke test passed
+Python compilation passed
+Secret scan passed after release cleanup
+Zip integrity passed
 ```
 
 ## Next implementation
 
-**Stage 9 — Capacity What-If Simulator** is next. It should simulate removing discharge blockers and estimate beds recovered, delay-hours removed, patients moved toward readiness, and potential ED boarding relief.
+**Stage 10B — Transactional Persistence** is next.
 
-## Remaining production work
+Recommended order:
 
-- PostgreSQL persistence;
-- enterprise SSO/OIDC and MFA;
-- structured monitoring;
-- model calibration and patient-group validation;
-- subgroup/fairness evaluation;
-- formal SHAP;
-- portfolio screenshots, video, CI, and public landing page.
+1. PostgreSQL-backed users, tasks, task events, audit, access, memory, and simulations.
+2. Schema migrations, constraints, and JSON migration tooling.
+3. Backup, restore, retention, and concurrency tests.
+4. Stage 10C model calibration, patient-group validation, threshold analysis, subgroup review, and SHAP.
+5. Screenshots, demonstration video, static architecture images, and GitHub Pages.
+
+## Important limitations
+
+- JSON persistence is still suitable only for a local or single-user demonstration.
+- Stage 10A request metrics reset when the API process restarts.
+- The operational models and simulator use synthetic/proxy data and are not validated for clinical use.

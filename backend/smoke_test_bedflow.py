@@ -39,9 +39,12 @@ def test_api() -> None:
     client = app.test_client()
     for path in (
         "/api/health",
+        "/api/ready",
+        "/api/system/version",
         "/api/hospital_capacity",
         "/api/discharge_queue?limit=3",
         "/api/fhir/capability",
+        "/api/simulations/capability",
         "/api/auth/demo_users",
     ):
         response = client.get(path)
@@ -59,7 +62,28 @@ def test_api() -> None:
     assert client.get("/api/auth/me", headers=headers).status_code == 200
     assert client.get("/api/audit_log", headers=headers).status_code == 200
     assert client.get("/api/tasks/events", headers=headers).status_code == 200
-    print("API, Stage 8 authentication, and model-scored queue checks passed.")
+    metrics = client.get("/api/metrics", headers=headers)
+    assert metrics.status_code == 200
+    assert metrics.get_json().get("total_requests", 0) > 0
+    health = client.get("/api/health", headers={"X-Request-ID": "SMOKE-REQUEST-ID"})
+    assert health.headers.get("X-Request-ID") == "SMOKE-REQUEST-ID"
+    assert health.headers.get("X-Response-Time-Ms") is not None
+    simulation = client.post(
+        "/api/simulations/run",
+        json={
+            "scenario": {
+                "scenario_name": "Smoke-test scenario",
+                "scope_unit": "Med/Surg",
+                "pharmacy_clearance_percent": 10,
+                "horizon_hours": 24,
+            },
+            "save": False,
+        },
+        headers=headers,
+    )
+    assert simulation.status_code == 200
+    assert simulation.get_json().get("simulation_method")
+    print("API, Stage 8 authentication, Stage 9 simulation, Stage 10A observability, and model-scored queue checks passed.")
 
 
 def test_committee() -> None:

@@ -45,8 +45,18 @@ from .tasks import (
     summarize_tasks,
     list_task_events,
 )
+from .observability import APP_VERSION, UPGRADE_STAGE, configure_observability, metrics_snapshot
+from .readiness import build_readiness_report
+from .simulator import (
+    list_simulation_runs,
+    run_capacity_simulation,
+    save_simulation_run,
+    simulation_capability,
+    simulation_runs_csv,
+)
 
 app = Flask(__name__)
+configure_observability(app)
 
 _QUEUE_SCORE_CACHE = {"key": None, "predictions": None}
 _QUEUE_SCORE_LOCK = threading.Lock()
@@ -76,15 +86,45 @@ def _get_scored_demo_patients(df: pd.DataFrame) -> pd.DataFrame:
 
 @app.route("/api/health", methods=["GET"])
 def health():
+    """Lightweight liveness endpoint for container and platform probes."""
     return jsonify({
         "status": "ok",
         "app": "BedFlow AI",
+        "app_version": APP_VERSION,
         "model_loaded": bedflow_models.is_trained,
         "model_version": bedflow_models.model_version,
         "model_source": "saved artifact" if bedflow_models.loaded_from_artifact else "in-memory model",
         "dataset_ready": os.path.exists(DATA_PATH),
+        "upgrade_stage": UPGRADE_STAGE,
+        "simulation_ready": True,
+        "observability_ready": True,
         "authentication": auth_status(),
     })
+
+
+@app.route("/api/ready", methods=["GET"])
+def readiness():
+    """Deep readiness check for deployment routing and operator diagnostics."""
+    report = build_readiness_report()
+    return jsonify(report), (200 if report.get("ready") else 503)
+
+
+@app.route("/api/system/version", methods=["GET"])
+def system_version():
+    return jsonify({
+        "status": "success",
+        "app": "BedFlow AI",
+        "app_version": APP_VERSION,
+        "upgrade_stage": UPGRADE_STAGE,
+        "completed_stages": [1, 2, 3, 4, 5, 6, 7, 8, 9, "10A"],
+    })
+
+
+@app.route("/api/metrics", methods=["GET"])
+@require_permission("access.read")
+def operational_metrics():
+    """Administrator-only in-process request metrics for the demo API."""
+    return jsonify(metrics_snapshot())
 
 @app.route("/api/auth/demo_users", methods=["GET"])
 def auth_demo_users():
@@ -208,6 +248,7 @@ def data_sources():
 
 
 @app.route("/api/prepare_readmission_data", methods=["POST"])
+@require_permission("model.manage")
 def prepare_readmission_data():
     """Prepare the public diabetes readmission training data layer."""
     try:
@@ -268,6 +309,88 @@ def discharge_queue():
     except Exception:
         predictions = None
     return jsonify(build_discharge_queue(df, model_predictions=predictions, limit=limit))
+
+
+@app.route("/api/simulations/capability", methods=["GET"])
+def simulations_capability():
+    """Describe Stage 9 scenario levers, protected fields, and limitations."""
+    return jsonify(simulation_capability())
+
+
+@app.route("/api/simulations/run", methods=["POST"])
+@require_permission("simulation.run")
+def simulations_run():
+    """Run a model-backed operational counterfactual without retraining."""
+    if not os.path.exists(DATA_PATH):
+        return jsonify({"status": "error", "message": "No patient dataset found"}), 404
+    data = request.json or {}
+    scenario = data.get("scenario", data)
+    save_requested = bool(data.get("save", False))
+    if save_requested and not has_permission(g.bedflow_user, "simulation.save"):
+        return jsonify({"status": "error", "message": "This role cannot save simulation runs"}), 403
+
+    try:
+        df = pd.read_csv(DATA_PATH, keep_default_na=False)
+        current_predictions = _get_scored_demo_patients(df)
+        current_capacity = build_hospital_capacity_snapshot(
+            df, model_predictions=current_predictions
+        )
+        result = run_capacity_simulation(
+            patient_df=df,
+            current_predictions=current_predictions,
+            scoring_fn=bedflow_models.predict_dataframe,
+            scenario_payload=scenario,
+            current_capacity=current_capacity,
+            actor=g.bedflow_user,
+        )
+        if save_requested:
+            result = save_simulation_run(result)
+        record_access_event(
+            "capacity_simulation",
+            user=g.bedflow_user,
+            outcome="success",
+            detail=(
+                f"Ran scenario {result.get('simulation_id')} "
+                f"(saved={bool(result.get('saved'))})"
+            ),
+        )
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 500
+
+
+@app.route("/api/simulations", methods=["GET"])
+@require_permission("simulation.read")
+def simulations_history():
+    try:
+        limit = int(request.args.get("limit", 100))
+    except (TypeError, ValueError):
+        limit = 100
+    return jsonify(list_simulation_runs(
+        limit=limit,
+        actor_role=request.args.get("actor_role"),
+    ))
+
+
+@app.route("/api/simulations/export.csv", methods=["GET"])
+@require_permission("simulation.export")
+def simulations_export_csv():
+    runs = list_simulation_runs(limit=1000)
+    record_access_event(
+        "simulation_export",
+        user=g.bedflow_user,
+        outcome="success",
+        detail=f"Exported {len(runs)} saved simulation runs",
+    )
+    return Response(
+        simulation_runs_csv(runs),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=bedflow_simulation_runs.csv"
+        },
+    )
 
 
 @app.route("/api/discharge_checklist", methods=["POST"])
@@ -376,7 +499,7 @@ def overdue_tasks():
 
 
 @app.route("/api/tasks/sync", methods=["POST"])
-@require_auth
+@require_permission("task.sync")
 def sync_tasks():
     """Create or refresh workflow tasks from one patient's checklist blockers."""
     data = request.json or {}

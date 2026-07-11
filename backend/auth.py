@@ -42,6 +42,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "audit.export",
         "access.read",
         "fhir.export",
+        "simulation.run",
+        "simulation.save",
+        "simulation.read",
+        "simulation.export",
     },
     "Bed Manager": {
         "task.sync",
@@ -53,6 +57,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "decision.hold",
         "audit.read",
         "fhir.export",
+        "simulation.run",
+        "simulation.save",
+        "simulation.read",
+        "simulation.export",
     },
     "Physician": {
         "task.update_own",
@@ -63,6 +71,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "decision.hold",
         "audit.read",
         "fhir.export",
+        "simulation.read",
     },
     "Nurse": {
         "task.update_own",
@@ -71,8 +80,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "decision.hold",
         "audit.read",
         "fhir.export",
+        "simulation.read",
     },
-    "Pharmacist": {"task.update_own", "audit.read", "fhir.export"},
+    "Pharmacist": {"task.update_own", "audit.read", "fhir.export", "simulation.read"},
     "Case Manager": {
         "task.update_own",
         "decision.save",
@@ -80,6 +90,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "decision.hold",
         "audit.read",
         "fhir.export",
+        "simulation.read",
     },
     "Utilization Manager": {
         "task.update_own",
@@ -88,9 +99,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "decision.hold",
         "audit.read",
         "fhir.export",
+        "simulation.read",
     },
-    "Social Worker": {"task.update_own", "audit.read", "fhir.export"},
-    "Transport Coordinator": {"task.update_own", "audit.read", "fhir.export"},
+    "Social Worker": {"task.update_own", "audit.read", "fhir.export", "simulation.read"},
+    "Transport Coordinator": {"task.update_own", "audit.read", "fhir.export", "simulation.read"},
 }
 
 DECISION_PERMISSION = {

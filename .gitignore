@@ -29,7 +29,19 @@ Thumbs.db
 *.pyc
 backend/__pycache__/
 
-# Stage 8 runtime identity and event stores
+# Runtime identity, event, and simulation stores
 database/demo_users.json
 database/access_log.json
 database/task_events.json
+
+database/simulation_runs.json
+
+# Stage 10A release output
+/dist/
+
+# Additional runtime-generated demo stores
+database/audit_log.json
+database/tasks.json
+database/simulation_runs.json
+database/bedflow_memory_history.json
+database/bedflow_memory_state.json

@@ -11,3 +11,12 @@ venv/
 *.log
 .DS_Store
 Thumbs.db
+database/demo_users.json
+database/access_log.json
+database/audit_log.json
+database/tasks.json
+database/task_events.json
+database/simulation_runs.json
+database/bedflow_memory_history.json
+database/bedflow_memory_state.json
+dist/
