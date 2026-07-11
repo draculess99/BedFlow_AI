@@ -100,6 +100,7 @@ def start_backend() -> subprocess.Popen:
             BACKEND_HOST,
             "--port",
             str(BACKEND_PORT),
+            "--threads=2",  # Reduce threads to save memory
             "backend.api:app",
         ]
     else:
@@ -108,6 +109,7 @@ def start_backend() -> subprocess.Popen:
     env = os.environ.copy()
     env["BEDFLOW_API_HOST"] = BACKEND_HOST
     env["BEDFLOW_API_PORT"] = str(BACKEND_PORT)
+    env.setdefault("MALLOC_ARENA_MAX", "2")  # Crucial to prevent Python glibc memory fragmentation bloat
     return subprocess.Popen(command, cwd=str(ROOT_DIR), env=env)
 
 
@@ -117,6 +119,7 @@ def start_frontend() -> subprocess.Popen:
 
     env = os.environ.copy()
     env.setdefault("BEDFLOW_API_URL", f"http://{BACKEND_HOST}:{BACKEND_PORT}/api")
+    env.setdefault("MALLOC_ARENA_MAX", "2")  # Memory optimization
     return subprocess.Popen(
         [
             sys.executable,
@@ -126,6 +129,9 @@ def start_frontend() -> subprocess.Popen:
             str(DASHBOARD_PATH),
             "--server.address=0.0.0.0",
             f"--server.port={DASHBOARD_PORT}",
+            "--server.fileWatcherType=none",      # Disable file watcher (saves ~50-100MB RAM)
+            "--browser.gatherUsageStats=false",   # Disable telemetry
+            "--global.developmentMode=false"      # Disable dev-mode overhead
         ],
         cwd=str(ROOT_DIR),
         env=env,
