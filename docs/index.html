@@ -19,11 +19,10 @@
             font-weight: 700 !important;
         }
         .mermaid svg {
+            min-width: 1200px !important;
             width: 100% !important;
             max-width: none !important;
             height: auto !important;
-            transform: scale(1.1);
-            transform-origin: top center;
         }
         
         :root {
@@ -498,7 +497,7 @@
             <h2>Resilient, API-first architecture.</h2>
             <p>A decoupled design that securely bridges predictive models and agentic LLMs with rigorous operational workflows.</p>
         </div>
-        <div class="mermaid-container" style="background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 40px; overflow-x: auto; max-width: 1000px; margin: 0 auto;">
+        <div class="mermaid-container" style="background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 40px; overflow-x: auto; max-width: 1200px; margin: 0 auto;">
             <div class="mermaid" style="display: flex; justify-content: center;">
 flowchart TB
     UI["Control Tower UI (Streamlit)"] --> API["Flask Backend API"]
