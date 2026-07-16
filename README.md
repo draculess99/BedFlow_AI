@@ -1113,3 +1113,4 @@ Final discharge readiness remains the responsibility of authorized clinical staf
   <strong>BedFlow AI demonstrates how analytics become operational workflow: prediction → explanation → ownership → supervised action → audit → capacity planning.</strong>
 </p>
 
+"# BedFlow_AI_SCALED" 
