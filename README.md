@@ -33,8 +33,8 @@ The application helps an authorized hospital team answer three practical questio
 
 ## Project Links
 
-- **Live Demo:** https://medpackai-production.up.railway.app/
-- **GitHub Repository:** https://github.com/draculess99/MEDPACK_AI/
+- **Live Demo:** https://healthcareai-production-a736.up.railway.app/bedflow/
+- **GitHub Repository:** https://github.com/draculess99/BedFlow_AI/
 - **LinkedIn:** https://www.linkedin.com/in/gammaconsult/
 - **Portfolio:** https://draculess99.github.io/
 
